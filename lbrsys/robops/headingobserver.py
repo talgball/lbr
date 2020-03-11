@@ -54,8 +54,8 @@ class HeadingObserver(object):
         self.testMode       = testMode
 
         logging.debug("Initialized Heading Observer for heading %s" % (self.target,))
-        print("Initialized Observer for heading %s at %.4f" % \
-              (self.target, time.ascitime()))
+        print("Initialized Observer for heading %s at %s" % \
+              (self.target, time.asctime()))
 
 
     def headingAchieved(self, current, target):

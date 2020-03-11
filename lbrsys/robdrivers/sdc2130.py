@@ -7,7 +7,7 @@ driver module for Roboteq sdc2130 high performance motor controller
     is via its proprietary protocol, as implemented in
     this driver.
 
-    Note that mix motor control Mode 1 is assumed.
+    Note that independent motor control mode is assumed.
 """
 
 
@@ -54,24 +54,16 @@ class SDC2130:
     timeout = 0.250
     #timeout = 1 #second
     #timeout = 0 #non-blocking mode
-    STOP_MOTOR_COMMAND = '!M 0 0\r'
+    STOP_MOTOR_COMMAND = b'!M 0 0\r'
     
 
     def __init__(self, port=SDC2130_Port):
         self.port = port
         try:
-            self.rawController = Serial(self.port, self.baudrate, self.bytesize,
-                                     self.parity, self.stopbits, self.timeout)
+            self.controller = Serial(
+                self.port, self.baudrate, self.bytesize,
+                self.parity, self.stopbits, self.timeout)
 
-            self.controller = io.TextIOWrapper(io.BufferedRWPair(
-                    self.rawController, self.rawController, 1),
-                    newline='\r', line_buffering = True)
-            # re-examine this access approach and see the comments re not passing same obj as reader / writer
-            # for BufferedRWPair
-            # https://docs.python.org/3/library/io.html#io.BufferedRandom
-            #   but BufferedRandom is not seekable, so the following fails
-            # self.controller = io.TextIOWrapper(io.BufferedRandom(self.rawController, buffer_size=1),
-            #                                    newline='\r', line_buffering=True)
         except:
             print("Unexpected error:", sys.exc_info()[0])
             raise
@@ -82,24 +74,24 @@ class SDC2130:
         self.ampsPub    = publisher.Publisher("SDC2130 Amperage Publisher")
         self.motorControlPub = publisher.Publisher("SDC2130 Motor Control Publisher")
 
-        self.lastVoltages = voltages(12.0,12.0,5.11,time.asctime())
+        self.lastVoltages = voltages(12.0, 12.0, 5.11, time.asctime())
         # self.lastVoltages = voltages(0.,0.,0.,time.asctime())
 
     
     def closeController(self):
         try:
-            self.rawController.close()
+            self.controller.close()
             self.messagePub.publish(time.asctime() + " Controller Closed")
         except:
             msg = time.asctime() + " Error Closing Controller"
             self.messagePub.publish(msg)
             print(msg)
 
-    def parseQueryResults(self,buffer,commandChar):
+    def parseQueryResults(self, buffer, commandChar):
         values = []
         try:
             #print "in parse with: %s" % (buffer,)
-            results = buffer[2:].split(':')
+            results = buffer[2:-1].split(b':')
             #print results
 
             if results:    
@@ -107,41 +99,39 @@ class SDC2130:
                     values.append(float(r))
             else:
                 values.append(0.0)
-        except:
+        except Exception as e:
             msg = time.asctime() + ": Error parsing query results: '%s'  Expected type %s\n" % (buffer, commandChar)
             self.messagePub.publish(msg)
-            print(msg)
-            values = [-999.,-999.]
+            print("{}\n{}".format(msg, str(e)))
+            values = [-999., -999.]
             
         return tuple(values)
                 
 
     def getVoltages(self):
-        #
-        # sdc2130 reports main bat voltage, internal voltage at driver stage,
-        #   5V output voltage
-        #   first 2 are 10x, third one is in millivolts
-
+        """
+        sdc2130 reports main bat voltage, internal voltage at driver stage,
+            5V output voltage
+            first 2 are 10x, third one is in millivolts
+        """
+        readBuffer = b''
         try:
             # self.controller.flush()
-            self.controller.write('?V\r')   # query for the voltages'
+            self.controller.write(b'?V\r')   # query for the voltages'
             self.controller.flush()
 
             # read the good echo, then the result
-            readBuffer = self.controller.readline()
-            if readBuffer == '?V\r':
-                readBuffer = self.controller.readline()
+            readBuffer = self.controller.read_until(b'\r')
+            if readBuffer == b'?V\r':
+                readBuffer = self.controller.read_until(b'\r')
             else:
-                readBuffer = ""
+                readBuffer = b''
 
         except:
             msg = time.asctime() + ' Error getting voltages'
             self.messagePub.publish(msg)
             print(msg)
 
-        #logging.debug("getVoltages parsing buffer: "+readBuffer)
-        #July, 2015 - unable to determine why having two ports open causes
-        #   read errors
         readings = ()
         if len(readBuffer) > 3:
             readings = self.parseQueryResults(readBuffer,'V')
@@ -166,19 +156,23 @@ class SDC2130:
 
 
     def getAmps(self):
-        # docs indicate that return value must be divided by 10
-        # in amps to get the actual value
+        """
+        read and return the amount of current flowing through each motor
+        docs indicate that return value must be divided by 10
+            in amps to get the actual value
+        """
+        readBuffer = b''
         try:
             # self.controller.flush()
-            self.controller.write('?A\r')   # query for the amp readings
+            self.controller.write(b'?A\r')   # query for the amp readings
             self.controller.flush()
 
             # read the good echo, then read the result
-            readBuffer = self.controller.readline()
-            if readBuffer == '?A\r':
-                readBuffer = self.controller.readline()
+            readBuffer = self.controller.read_until(b'\r')
+            if readBuffer == b'?A\r':
+                readBuffer = self.controller.read_until(b'\r')
             else:
-                readBuffer = ""
+                readBuffer = b''
 
         except:
             msg = time.asctime() + ' Error getting amperages'
@@ -204,15 +198,17 @@ class SDC2130:
         return amps
 
 
-    # resetController - similar to power off and power on
-    # warning - also resets the serial connection
     def resetController(self):
-
+        """
+        reset the controller - similar to power off and power on
+            warning - also resets the serial connection
+        :return:
+        """
         try:
             self.stopMotors()
-            self.controller.write('%RESET 321654987\r')
+            self.controller.write(b'%RESET 321654987\r')
             self.controller.flush()
-            resetResult = self.controller.readline()
+            resetResult = self.controller.read_until(b'\r')
         except:
             print('error reseting controller')
             resetResult = "Error"
@@ -221,17 +217,21 @@ class SDC2130:
 
         return resetResult
 
-    
-    # mixMotorCommand
-    #   set the speed and direction of the motors
-    #   As of July, 2017 independent motor operation is assumed
-    #   speed sets the speed of both motors
-    #   direction adds steering in a tank like manner
-    #   range is -1000 to +1000 for each motor called in decimal
-    #   if motorCommand is passed to the function, it is sent without modification
-    #       ..or verification todo: security
-    #
+
     def mixMotorCommand(self, speed=0, direction=0, motorCommand=None):
+        """
+        set the speed and direction of the motors
+        As of July, 2017 independent motor operation is assumed
+       speed sets the speed of both motors
+       direction adds steering in a tank like manner
+       range is -1000 to +1000 for each motor called in decimal per Roboteq specification
+       if motorCommand is passed to the function, it is sent without modification
+           ..or verification todo: security
+        :param speed:
+        :param direction:
+        :param motorCommand: - named tuple
+        :return: motorCommandResult - namedtuple
+        """
         m1 = speed + direction
         if m1 > 1000:
             m1 = 1000
@@ -246,22 +246,27 @@ class SDC2130:
 
         return self.generalMotorCommand(m1, m2, motorCommand)
 
-    # generalMotorCommand
-    #   Used to send commands to each motor using channel 1 and channel 2.
-    #   Controller interprets command based on mode. 
-    #   Range is -1000 to +1000
-    #
-    def generalMotorCommand(self,chan1=0,chan2=0,motorCommand=None):
-        
-        if not motorCommand:
 
+    def generalMotorCommand(self, chan1=0, chan2=0, motorCommand=None):
+        """
+        generalMotorCommand
+            Used to send commands to each motor using channel 1 and channel 2.
+            Controller interprets command based on mode.
+            Range is -1000 to +1000
+
+        :param chan1:
+        :param chan2:
+        :param motorCommand:
+        :return:
+        """
+        if not motorCommand:
             if chan1 < -1000 or chan1 > 1000:
                 chan1 = 0
 
             if chan2 < -1000 or chan2 > 1000:
                 chan2 = 0
 
-            self.motorCommand = '!M %d %d\r' % (chan1,chan2)
+            self.motorCommand = b'!M %d %d\r' % (chan1, chan2)
         else:
             self.motorCommand = motorCommand
         
@@ -269,23 +274,21 @@ class SDC2130:
         if executionEnabled:
             try:
                 self.controller.write(self.motorCommand)
-                reply = self.controller.readline() # first get echo
-                #print reply 
-                reply = self.controller.readline()
-                #logging.debug("motor reply:"+reply)
-                if reply == '':
-                    commandReply = ''
+                reply = self.controller.read_until(b'\r') # first get echo
+                reply = self.controller.read_until(b'\r')
+                if reply == b'':
+                    commandReply = b''
                 else:
                     commandReply = reply[0]
             except SerialException as e:
                 print('\t***error writing motor command: %s to %s' % (motorCommand,self.port))
-                print('\tSerial Exception: {0}: {1}'.format(e.errno, e.strerror))
-                commandReply = ''
+                print('\tSerial Exception: {}'.format(str(e)))
+                commandReply = b''
 
-            if commandReply == '+':
+            if commandReply == b'+':
                 result = motorCommandResult('Success',
                                             motorCommand, commandReply, t)
-            elif commandReply == '-':
+            elif commandReply == b'-':
                 result = motorCommandResult('Failure',
                           motorCommand, commandReply, t)
             else:
@@ -297,21 +300,25 @@ class SDC2130:
 
         self.motorControlPub.publish(result)   
         return result 
-                
-    #
-    # stopMotors
-    #
-    #  toDo: implement a Stop Publisher and Subscribe to it
-    #
+
+
     def stopMotors(self):
+        """
+        Immediately stop all motors
+        todo implement a Stop Publisher and Subscribe to i
+        :return:
+        """
         result = self.mixMotorCommand(0,0)
         return(result)            
 
-    #
-    # gathers the readings (todo: figure out publishing)
-    #    also keep watchdog alive (this gen requires a ! command for that)
-    #
+
     def checkController(self):
+        """
+        gathers the readings (todo figure out publishing)
+        Note that the sdc2130, unlike the ax500 predecessor, requires
+        a ! command in order to keep the watchdog alive
+        :return:
+        """
         v = self.getVoltages()
         a = self.getAmps()
 
@@ -319,7 +326,7 @@ class SDC2130:
         # could flash an led or take any other runtime action
         # to keep watchdog alive
         if self.motorCommand != self.STOP_MOTOR_COMMAND:
-            self.mixMotorCommand(0,0,motorCommand=self.motorCommand)
+            self.mixMotorCommand(0, 0, motorCommand=self.motorCommand)
 
         return v,a
         # todo - add power, etc.
@@ -329,16 +336,13 @@ if __name__ == "__main__":
     c = SDC2130()
 
     speed = 0
-    steering = 300
+    steering = 0
     cmd = c.mixMotorCommand(speed, steering)
-    for r in range(3):
+
+    for r in range(5):
         time.sleep(.9)
-        v,a = c.checkController()
-        # if a.channel1 == 0:
-        #     print "Channel 1 motor stopped"
-        print(v,a)
+        v, a = c.checkController()
+        print(v, a)
+
     c.stopMotors()
-
-
-    
-     
+    c.closeController()

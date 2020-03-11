@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """"
  docksignal.py - arrange to obtain docking signals from the active dock
     and post them to httpservice

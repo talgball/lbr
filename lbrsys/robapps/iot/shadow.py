@@ -28,6 +28,7 @@ import multiprocessing
 import traceback
 import time
 import queue
+import logging
 
 
 # - Overview -
@@ -95,11 +96,13 @@ class ShadowOps(object):
         self.args = args
         self.shadow_command_q = shadow_command_q
         print("Initializing shadow operations")
+        logging.info("Initializing shadow operations")
 
         if not args.verbosity:
             args.verbosity = io.LogLevel.NoLogs.name
         io.init_logging(getattr(io.LogLevel, args.verbosity), 'stderr')
         print("Set aws logging to %s" % args.verbosity)
+        logging.info("Set aws logging to %s" % args.verbosity)
 
         self.mqtt_connection = None
         self.shadow_client = None
@@ -114,24 +117,25 @@ class ShadowOps(object):
         self.shadow_command_thread = threading.Thread(target=self.wait_to_end_shadow,
                                                       name="Shadow Command Thread")
 
-        # print("Starting Shadow Command Thread")
+        logging.debug("Starting Shadow Command Thread")
         self.shadow_command_thread.start()
 
-        # print("Starting Shadow Operations Main")
+        # logging.debug("Starting Shadow Operations Main")
         self.main(self.args)
 
 
     # Function for gracefully quitting this sample
     def exit(self, msg_or_exception):
         if isinstance(msg_or_exception, Exception):
-            print("Exiting sample due to exception.")
+            logging.debug("Exiting sample due to exception.")
             traceback.print_exception(msg_or_exception.__class__, msg_or_exception, sys.exc_info()[2])
         else:
-            print("Exiting sample:", msg_or_exception)
+            logging.debug("Exiting sample:", msg_or_exception)
 
         with self.locked_data.lock:
             if not self.locked_data.disconnect_called:
                 print("Disconnecting...")
+                logging.info("Disconnecting...")
                 self.locked_data.disconnect_called = True
                 future = self.mqtt_connection.disconnect()
                 future.add_done_callback(self.on_disconnected)
@@ -140,6 +144,7 @@ class ShadowOps(object):
     def on_disconnected(self, disconnect_future):
         # type: (Future) -> None
         print("Disconnected.")
+        logging.debug("Disconnected.")
 
         # Signal that sample is finished
         self.is_sample_done.set()
@@ -148,29 +153,29 @@ class ShadowOps(object):
     def on_get_shadow_accepted(self, response):
         # type: (iotshadow.GetShadowResponse) -> None
         try:
-            # print("Finished getting initial shadow state.")
+            # logging.debug("Finished getting initial shadow state.")
 
             with self.locked_data.lock:
                 if self.locked_data.shadow_value is not None:
-                    # print("  Ignoring initial query because a delta event has already been received.")
+                    # logging.debug("  Ignoring initial query because a delta event has already been received.")
                     return
 
             if response.state:
                 if response.state.delta:
                     value = response.state.delta.get(self.shadow_property)
                     if value:
-                        print("  Shadow contains delta value '{}'.".format(value))
+                        logging.debug("  Shadow contains delta value '{}'.".format(value))
                         self.change_shadow_value(value)
                         return
 
                 if response.state.reported:
                     value = response.state.reported.get(self.shadow_property)
                     if value:
-                        print("  Shadow contains reported value '{}'.".format(value))
+                        logging.debug("  Shadow contains reported value '{}'.".format(value))
                         self.set_local_value_due_to_initial_query(response.state.reported[self.shadow_property])
                         return
 
-            print("  Shadow document lacks '{}' property. Setting defaults...".format(self.shadow_property))
+            logging.debug("  Shadow document lacks '{}' property. Setting defaults...".format(self.shadow_property))
             self.change_shadow_value(SHADOW_VALUE_DEFAULT)
             return
 
@@ -181,7 +186,7 @@ class ShadowOps(object):
     def on_get_shadow_rejected(self, error):
         # type: (iotshadow.ErrorResponse) -> None
         if error.code == 404:
-            print("Thing has no shadow document. Creating with defaults...")
+            logging.debug("Thing has no shadow document. Creating with defaults...")
             self.change_shadow_value(SHADOW_VALUE_DEFAULT)
         else:
             self.exit("Get request was rejected. code:{} message:'{}'".format(
@@ -191,18 +196,18 @@ class ShadowOps(object):
     def on_shadow_delta_updated(self, delta):
         # type: (iotshadow.ShadowDeltaUpdatedEvent) -> None
         try:
-            print("Received shadow delta event.")
+            logging.debug("Received shadow delta event.")
             if delta.state and (self.shadow_property in delta.state):
                 value = delta.state[self.shadow_property]
                 if value is None:
-                    print("  Delta reports that '{}' was deleted. Resetting defaults...".format(self.shadow_property))
+                    logging.debug("  Delta reports that '{}' was deleted. Resetting defaults...".format(self.shadow_property))
                     self.change_shadow_value(SHADOW_VALUE_DEFAULT)
                     return
                 else:
-                    print("  Delta reports that desired value is '{}'. Changing local value...".format(value))
+                    logging.debug("  Delta reports that desired value is '{}'. Changing local value...".format(value))
                     self.change_shadow_value(value)
             else:
-                print("  Delta did not report a change in '{}'".format(self.shadow_property))
+                logging.debug("  Delta did not report a change in '{}'".format(self.shadow_property))
 
         except Exception as e:
             self.exit(e)
@@ -212,16 +217,16 @@ class ShadowOps(object):
         #type: (Future) -> None
         try:
             future.result()
-            print("Update request published.")
+            logging.debug("Update request published.")
         except Exception as e:
-            print("Failed to publish update request.")
+            logging.debug("Failed to publish update request.")
             self.exit(e)
 
 
     def on_update_shadow_accepted(self, response):
         # type: (iotshadow.UpdateShadowResponse) -> None
         try:
-            print("Finished updating reported shadow value to '{}'.".format(response.state.reported[self.shadow_property])) # type: ignore
+            logging.debug("Finished updating reported shadow value to '{}'.".format(response.state.reported[self.shadow_property])) # type: ignore
             # print("Enter desired value: ") # remind user they can input new values
         except:
             self.exit("Updated shadow is missing the target property.")
@@ -242,14 +247,14 @@ class ShadowOps(object):
     def change_shadow_value(self,value):
         with self.locked_data.lock:
             if self.locked_data.shadow_value == value:
-                print("Local value is already '{}'.".format(value))
+                logging.debug("Local value is already '{}'.".format(value))
                 # print("Enter desired value: ") # remind user they can input new values
                 return
 
-            print("Changed local shadow value to '{}'.".format(value))
+            logging.debug("Changed local shadow value to '{}'.".format(value))
             self.locked_data.shadow_value = value
 
-        print("Updating reported shadow value to '{}'...".format(value))
+        logging.debug("Updating reported shadow value to '{}'...".format(value))
         request = iotshadow.UpdateShadowRequest(
             thing_name=self.thing_name,
             state=iotshadow.ShadowState(
@@ -279,7 +284,7 @@ class ShadowOps(object):
                     self.change_shadow_value(new_value)
 
             except Exception as e:
-                print("Exception on input thread.")
+                logging.debug("Exception on input thread.")
                 self.exit(e)
                 break
 
@@ -301,7 +306,7 @@ class ShadowOps(object):
                     self.change_shadow_value(response[0])
 
             except Exception as e:
-                print("Exception on getting telemetry")
+                logging.debug("Exception on getting telemetry")
                 self.exit(e)
                 break
 
@@ -315,7 +320,7 @@ class ShadowOps(object):
             if task == "Shutdown":
                 with self.locked_data.lock:
                     self.locked_data.stop = True
-                # print("Shadow stop signaled")
+                # logging.debug("Shadow stop signaled")
                 self.shadow_command_q.task_done()
                 break
             else:
@@ -324,11 +329,11 @@ class ShadowOps(object):
 
 
     def main(self, args):
-        # print("Spinning up Shadow awsiot resources")
+        # logging.debug("Spinning up Shadow awsiot resources")
         event_loop_group = io.EventLoopGroup(1)
         host_resolver = io.DefaultHostResolver(event_loop_group)
         client_bootstrap = io.ClientBootstrap(event_loop_group, host_resolver)
-        # print("Shadow resources up")
+        # logging.debug("Shadow resources up")
 
         if args.use_websocket == True:
             proxy_options = None
@@ -362,6 +367,8 @@ class ShadowOps(object):
 
         print("Connecting to {} with client ID '{}'...".format(
             args.endpoint, args.client_id))
+        logging.debug("Connecting to {} with client ID '{}'...".format(
+            args.endpoint, args.client_id))
 
         connected_future = self.mqtt_connection.connect()
 
@@ -374,6 +381,7 @@ class ShadowOps(object):
         # fails or succeeds.
         connected_future.result()
         print("Connected!")
+        logging.debug("Connected!")
 
         try:
             # Subscribe to necessary topics.

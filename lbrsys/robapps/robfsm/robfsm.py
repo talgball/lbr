@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
  robfsm.py - Provide a configurable state machine for executing
     robot behaviours, initailly focused on navigation tasks.

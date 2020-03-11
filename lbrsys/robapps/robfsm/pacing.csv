@@ -1,0 +1,12 @@
+Type,Current State,heading,Forward,Rear,Left,Right,Amps Left,Amps Right,Volts,Dock Left,Dock Right,Time,O:level,O:angle,O:range,O:sensor,O:duration,O:heading,O:turn,Next State
+start,Initial Orientation,,,,,,,,,,,,,,,,,270,,Westerly
+,Westerly,255:280,,,,,,,,,,,0.25,0,57,Forward,,,,Facing East
+,Westerly,< 255,,,,,,,,,,,,,,,,,,Initial Orientation
+,Westerly,> 280,,,,,,,,,,,,,,,,,,Initial Orientation
+,Facing East,,54:60,,,,,,,,,,,,,,,90,,Easterly
+,Easterly,75:100,,,,,,,,,,,0.25,0,40,Forward,,,,Facing West
+,Easterly,< 75,,,,,,,,,,,,,,,,90,,Easterly
+,Easterly,> 100,,,,,,,,,,,,,,,,90,,Easterly
+,Facing West,,37:43,,,,,,,,,,,,,,,270,,At Ease
+end,At Ease,,,,,,,,,,,,0,0,,,,,,
+end,Pacing Failure,,,,,,,,,,,,0,0,,,,,,

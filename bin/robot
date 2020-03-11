@@ -1,0 +1,8 @@
+#!/bin/bash
+
+BIN_PATH="`dirname \"$0\"`"
+export PYTHONPATH="`( cd \"$BIN_PATH/..\" && pwd)`"
+if [ -z $PYTHONPATH ] ; then
+    exit 1 # fail
+fi
+$PYTHONPATH/lbrsys/robexec/robot.py

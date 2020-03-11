@@ -1,0 +1,10 @@
+lbr 
+Copyright 2009-2020 Tal G. Ball.  All Rights Reserved.
+
+For included derivative work in module shadow.py:
+AWS IoT SDK for Python v2
+Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved. 
+
+For module fsm.py:
+Copyright 2011 - 2020, Bernd Klein, Bodenseo;
+    Design by Denise Mitchinson adapted for python-course.eu by Bernd Klein

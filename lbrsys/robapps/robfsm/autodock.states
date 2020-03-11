@@ -1,0 +1,26 @@
+Type,Current State,heading,Forward,Rear,Left,Right,Amps Left,Amps Right,Volts,Dock Left,Dock Right,Time,O:level,O:angle,O:range,O:sensor,O:duration,O:heading,O:turn,Next State
+start,Initial Orientation,,,,,,,,,,,,,,,,,95,,Way Point 1
+,Way Point 1,85:100,< 255,,,,,,,,,,0.2,0,40,Forward,,,,Facing Dock
+,Way Point 1,> 100,,,,,,,,,,,,,,,,,,Initial Orientation
+,Way Point 1,< 85,,,,,,,,,,,,,,,,,,Initial Orientation
+,Way Point 1,,>= 255,,,,,,,,,,,,,,,,,Dock Failed
+,Facing Dock,,39:41,,,,,,,,,,,,,,,336,,Approaching
+,Facing Dock,,< 39,,,,,,,,,,0.2,180,40,Forward,,,,Facing Dock
+,Facing Dock,,> 41,,,,,,,,,,0.2,0,40,Forward,,,,Facing Dock
+,Approaching,330:345,<= 215,,,20:40,,,,,,,0.2,0,40,Forward,, ,,Dock Orientation
+,Approaching,< 330,,,,,,,,,,,,,,,,336,,Approaching
+,Approaching,> 345,,,,,,,,,,,,,,,,336,,Approaching
+,Approaching,,> 215,,,,,,,,,,,,,,,,,Dock Failed
+,Dock Orientation,,39:41,,,,,,,,,,,,,,,178,,Signal Lock
+,Dock Orientation,,< 39,,,,,,,,,,0.2,180,40,Forward,,,,Dock Orientation
+,Dock Orientation,,> 41,,,,,,,,,,0.2,0,40,Forward,,,,Dock Orientation
+,Signal Lock,175:185,,,,,,,,1,1,,0.25,180,,,5,,,Contact
+,Signal Lock,< 175,,,,,,,,,,,,,,,,178,,Signal Lock
+,Signal Lock,> 185,,,,,,,,,,,,,,,,178,,Signal Lock
+,Contact,,,,,,<= -5.1,<= -5.1,,1,1,,0,0,,,,,,Verifying
+,Contact,,,< 20,,,0,0,>= 12.8,1,1,,,,,,,,,Verifying
+,Contact,,,>=20,,,0,0,,1,1,,,,,,,,,Signal Lock
+,Verifying,,,< 20,,,,,>=  12.8,1,1,,0,0,,,,,,Dock Verified
+,Verifying,,,< 20,,,,,< 12.8,1,1,,0,0,,,-10,,,Verifying
+end,Dock Verified,,,,,,,,,,,,,,,,,,,Dock Verified
+end,Dock Failed,,,,,,,,<=  12.7,,,,,,,,,,,Dock Failed

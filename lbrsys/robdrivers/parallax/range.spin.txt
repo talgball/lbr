@@ -1,0 +1,149 @@
+{*********************************************************
+
+(Note: This source is provided for reference only.
+The language is Spinn from Parallax. See p8x32lbr.py for
+additional details.)
+
+Driver for an array of Maxbotix mb1220 range sensors. 
+
+}
+CON
+ _clkmode    = xtal1 + pll16x
+ _xinfreq    = 5_000_000
+ TO_CM       = 58               '58us per cm
+ 
+ { Corrected / added the back sensor on 5/1/17 for lbr2 }
+
+ fwd_cntrl    = 0
+ fwd_pin      = 1
+
+ left_cntrl   = 2
+ left_pin     = 3
+
+ right_cntrl  = 5                        'these are swapped due to wiring error
+ right_pin    = 4
+
+ back_cntrl   = 6
+ back_pin     = 7
+
+ 
+OBJ
+ vp    :       "Conduit"                 'transfers data to/from PC
+ qs    :       "QuickSample"             'measures INA up to 20mhz
+ 'term  :       "PC_Interface"
+ term   :       "FullDuplexSerial"
+
+VAR
+  long range_fwd, range_left, range_right, range_back  'using globals to facilitate use of viewport
+
+'PUB main | frame[406]
+PUB main | frame[406], t0, tnow, deltat
+
+{
+  vp.register(qs.sampleINA(@frame,1)) 'sample INA with 1 cog up to 20Mhz
+  vp.config(string("var:io(bits=[0..7]), range_fwd,range_left,range_right,range_back"))      
+  vp.config(string("lsa:view=io,timescale=50ms"))
+  vp.config(string("dso:view=io,timescale=10us"))
+  vp.config(string("start:mixed"))
+  vp.share(@range_fwd,@range_back)
+}
+
+
+  term.start(31,30,0,115200)
+  
+  outa[right_cntrl]~                                    'Clear I/O Pin
+  dira[right_cntrl]~~                                   'Make Pin Output
+  outa[fwd_cntrl]~                                      'Clear I/O Pin
+  dira[fwd_cntrl]~~                                     'Make Pin Output
+  outa[left_cntrl]~                                     'Clear I/O Pin
+  dira[left_cntrl]~~                                    'Make Pin Output
+  outa[back_cntrl]~                                     'Clear I/O Pin
+  dira[back_cntrl]~~                                    'Make Pin Output
+ 
+  dira[right_pin]~
+  dira[fwd_pin]~   
+  dira[left_pin]~
+  dira[back_pin]~  
+ 
+  range_fwd   := 0
+  range_left  := 0
+  range_right := 0
+  range_back  := 0
+
+  'Disable ranging to take control of the process
+  outa[right_cntrl] := 0
+  outa[fwd_cntrl] := 0
+  outa[left_cntrl] := 0
+  outa[back_cntrl] := 0
+  
+  'wait 1/2 a second to ensure that the mb1220 175ms startup cycle and any 
+  'current 100ms ranging cycles are completed
+  waitcnt(clkfreq >> 1 + cnt)
+  t0 := cnt
+  'term.str(string("Hello",13,10))
+
+    
+  repeat
+    tnow := cnt
+    range_fwd := mbping(fwd_pin,fwd_cntrl)   'Get Range In Centimeters
+    'term.str(string("Rangef: "))
+    'term.dec(range_fwd)
+    'term.str(string(13,10))
+    
+    range_left := mbping(left_pin,left_cntrl)                 
+    range_right := mbping(right_pin,right_cntrl)
+    range_back := mbping(back_pin,back_cntrl)
+    
+    sendRangesJSON(range_fwd,range_left,range_right,range_back,-1,deltat)
+    waitcnt(clkfreq / 20 + cnt)              'wait 50ms
+    deltat := cnt - tnow
+    
+
+PUB mbping(pulse_pin, ctrl_pin) : range | cnt1, cnt2
+''Return range in centimeters for MB1220
+                                                                                 
+  outa[ctrl_pin] := 1                                                   ' Set Control Pin
+  waitpne(0, |< pulse_pin, 0)
+  cnt1 := cnt
+  outa[ctrl_pin] := 0                                                   ' Clear I/O Pin (40 �s pulse, min is 20�s)
+  waitpeq(0, |< pulse_pin, 0)
+  cnt2 := cnt
+  range := (||(cnt1 - cnt2) / (clkfreq / 1_000_000)) / TO_CM
+ 
+
+
+PUB sendRangesJSON(fwd,left,right,back,bottom,delta)
+  term.str(string("{ ",34,"Ranges",34,": "))
+  term.str(string("{ ",34,"Forward",34,": "))
+  term.dec(fwd)
+  term.str(string(", "))
+  term.str(string(34,"Left",34,": "))  
+  term.dec(left)
+  term.str(string(", "))
+  term.str(string(34,"Right",34,": "))
+  term.dec(right)
+  term.str(string(", "))
+  term.str(string(34,"Back",34,": "))
+  term.dec(back)
+  term.str(string(", "))
+  term.str(string(34,"Bottom",34,": "))
+  term.dec(bottom)
+  term.str(string(", "))
+  term.str(string(34,"Deltat",34,": "))
+  term.dec(delta)
+  term.str(string("}}",13,10))
+
+
+PUB watchdog(wdpntr, limit) | t
+
+' wdpntr = hub address of watchdog variable
+' limit = milliseconds of "stuck" before Propeller reboot
+
+  long[wdpntr] := 0                                             ' reset
+  
+  t := cnt                                                      ' sync
+  repeat
+    waitcnt(t += clkfreq/1_000)                                 ' wait 1ms
+    long[wdpntr] += 1
+    if (long[wdpntr] > limit)                                   ' exceed watchdog limit
+      reboot                                                    ' yes, reboot                                           

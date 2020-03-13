@@ -244,7 +244,7 @@ class Robot(object):
         #if type(cmd) == dict:
         #    return preparedCommand
 
-        if type(cmd) == str and len(cmd) > 3:
+        if type(cmd) is str and len(cmd) > 3:
             if cmd[0:3] == '/r/':
                 values = cmd[3:].split('/')
                 if len(values) == 2:

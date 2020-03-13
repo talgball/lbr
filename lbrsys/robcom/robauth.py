@@ -25,9 +25,12 @@ __version__ = "1.0"
 import sys
 from collections import OrderedDict
 import secrets
+import hmac
+
+from lbrsys.settings import tokenFile
 
 
-DEFAULT_TOKEN_FILE = ".cred/robauth.tokens"
+DEFAULT_TOKEN_FILE = tokenFile
 api_tokens = OrderedDict()
 
 
@@ -78,7 +81,7 @@ def is_authorized(user=None, token=None):
         load_api_tokens()
 
     if user and token and user in api_tokens:
-        return secrets.compare_digest(token, api_tokens[user])
+        return hmac.compare_digest(token, api_tokens[user])
     else:
         return False
 

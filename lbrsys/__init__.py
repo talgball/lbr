@@ -48,6 +48,7 @@ dance       = namedtuple('dance', 'song')
 speech      = namedtuple('speech','msg')
 feedback    = namedtuple('feedback','info')
 screen      = namedtuple('screen', 'power')
+iot         = namedtuple('iot', 'msg')
 
 # map between namedtuple (i.e. message types) and channel types
 # This map is used in message routings
@@ -61,4 +62,5 @@ channelMap = {
     'Speech': {speech},
     'Application': {feedback, dict},
     'Dance': {dance},
+    'IoT': {iot},
     }

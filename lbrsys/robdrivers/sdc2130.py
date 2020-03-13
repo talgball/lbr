@@ -87,7 +87,9 @@ class SDC2130:
             self.messagePub.publish(msg)
             print(msg)
 
+
     def parseQueryResults(self, buffer, commandChar):
+        # todo consider factoring to eliminate this function
         values = []
         try:
             #print "in parse with: %s" % (buffer,)
@@ -220,16 +222,22 @@ class SDC2130:
 
     def mixMotorCommand(self, speed=0, direction=0, motorCommand=None):
         """
-        set the speed and direction of the motors
-        As of July, 2017 independent motor operation is assumed
-       speed sets the speed of both motors
-       direction adds steering in a tank like manner
-       range is -1000 to +1000 for each motor called in decimal per Roboteq specification
-       if motorCommand is passed to the function, it is sent without modification
-           ..or verification todo: security
-        :param speed:
-        :param direction:
-        :param motorCommand: - named tuple
+        Map the speed and direction of the motors onto power levels for
+        each motor in order to achieve tank-like steering.
+        As of July, 2017 independent motor operation is assumed, which
+        is one of the sdc2130 control modes.
+
+       range is -1000 to +1000 for each motor called in decimal per Roboteq
+       specification.
+
+       Note that in previous versions, the process of mapping required more
+       complex algorithms, originally leading to the factoring of this
+       function relative to generalMotorCommand.
+        :param speed: +/- 0-1000, 0 is stop
+        :param direction: +/- 0-1000, 0 is stop
+        :param motorCommand: - If motorCommand is passed to the function,
+        it is sent returned without modification.  This approach provides the
+        ability for the user to supply an alternative mapping algorithm.
         :return: motorCommandResult - namedtuple
         """
         m1 = speed + direction

@@ -18,6 +18,8 @@ _s.connect(("8.8.8.8", 80))
 robhttpAddress = (_s.getsockname()[0], robhttpPort)
 _s.close()
 
+
+
 # set USE_SSL = True to enable https for the http service
 #   Using this feature requires environment variables ROBOT_CERT and ROBOT_KEY
 #   to point to the certificate and private key files
@@ -56,6 +58,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # sqlite3 database containing robot configuration
 dbfile = os.path.join(BASE_DIR, 'lbrsys/robot.sqlite3')
+
+# authorization token file for robot api
+# tokenFile = os.path.join(BASE_DIR, '')
+tokenFile = '/home/robot/Documents/dev/.cred/robauth.tokens'
 
 # log directory and file configuration
 LOG_DIR = os.path.join(BASE_DIR, 'logs')

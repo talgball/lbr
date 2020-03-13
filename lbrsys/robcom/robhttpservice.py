@@ -62,7 +62,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
     def __init__(self, address, handler, receiveQ, sendQ):
-        HTTPServer.__init__(self,address,handler)
+        HTTPServer.__init__(self, address, handler)
         self.receiveQ = receiveQ
         self.sendQ = sendQ
         self.currentTelemetry = {'Ranges':{'Left':1,'Right':2,'Forward':3, 'Back':4, 'Bottom':5}}
@@ -112,12 +112,13 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
     def updateTelemetry(self):
         while True:
             msg = self.receiveQ.get()
+            # print("Updating telemetry: {}".format(str(msg)))
             self.receiveQ.task_done()
             if msg == "Shutdown":
                 break
 
-            if type(msg) == feedback:  # todo - reexamine and look at voltages
-                if type(msg.info) == dict:
+            if type(msg) is feedback:  # todo - reexamine and look at voltages
+                if type(msg.info) is dict:
                     self.currentTelemetry[list(msg.info.keys())[0]] = list(msg.info.values())[0]
                 else:
                     print("Please send telemetry feedback as dict: %s" % (msg.info))
@@ -177,7 +178,7 @@ class RobHandler(BaseHTTPRequestHandler):
             self.server.newTelemetry = False
 
         # for now, always send telemetry
-        self.send_header(b"Access-Control-Allow-Origin", "*")
+        self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         buffer = json.dumps(self.server.currentTelemetry).encode()
         # json.dump(buffer, self.wfile)
@@ -224,11 +225,11 @@ class RobHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         """" Setup to support ajax queries from client"""
         # print("Headers: %s" % str(self.headers))
-        self.send_response(200, "ok")
-        self.send_header(b'Access-Control-Allow-Credentials', b'true')
-        self.send_header(b'Access-Control-Allow-Origin', b'*')
-        self.send_header(b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS')
-        self.send_header(b"Access-Control-Allow-Headers", b"X-Requested-With, Content-type, User, Authorization")
+        self.send_response(200, 'ok')
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'X-Requested-With, Content-type, User, Authorization')
         self.end_headers()
         return
 
@@ -236,7 +237,7 @@ class RobHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         """ return current telemetry"""
         self.send_response(200)
-        self.send_header(b"Access-Control-Allow-Origin", b"*")
+        self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         buffer = json.dumps(self.server.currentTelemetry).encode()
         # json.dump(buffer, self.wfile)
@@ -265,13 +266,16 @@ class RobHandler(BaseHTTPRequestHandler):
 
         if not self.is_user_authorized():
             self.send_response(401)
-            self.send_header(b"Access-Control-Allow-Origin", b"*")
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             return
 
         #assume json for now, one obj per line.
         msgS = self.rfile.readline()
-        # print(msgS)
+
+        if type(msgS) is bytes:
+            msgS = msgS.decode()
+
         msgD = json.loads(msgS)
 
         if self.path == '/':
@@ -283,8 +287,9 @@ class RobHandler(BaseHTTPRequestHandler):
         return
 
 
-def startService(receiveQ,sendQ,addr=robhttpAddress):
+def startService(receiveQ, sendQ, addr=robhttpAddress):
     server = RobHTTPService(addr, RobHandler, receiveQ, sendQ)
+    # server = RobHTTPService(('', 9145), RobHandler, receiveQ, sendQ)
 
     telUpdateThread = threading.Thread(target=server.updateTelemetry,
                                        name = "TelemetryUpdateThread")
@@ -307,6 +312,7 @@ if __name__ == '__main__':
     
     p = multiprocessing.Process(target=startService,
                                 args=(receiveQ, sendQ,
+                                      # ('',9145)),
                                       ('lbr2a.ballfamily.org',9145)),
                                       #('127.0.0.1',9145)),
                                 name='Robot Http Service')                                 

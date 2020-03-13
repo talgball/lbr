@@ -25,7 +25,7 @@ import logging
 import queue
 
 from time import time as robtimer # legacy naming issue
-from time import time
+import time
 
 from lbrsys import power, nav
 

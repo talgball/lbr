@@ -106,20 +106,22 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
         else:
             # print('\ttelemetry age: %.3f' % (time.time() - self.telemetry_sent))
             self.set_heartbeat()
-    #
-    # run this updater in a separate thread
-    #
+
+
     def updateTelemetry(self):
+        """Telemetry updater - run in a separate thread."""
         while True:
             msg = self.receiveQ.get()
             # print("Updating telemetry: {}".format(str(msg)))
+
             self.receiveQ.task_done()
             if msg == "Shutdown":
                 break
 
             if type(msg) is feedback:  # todo - reexamine and look at voltages
                 if type(msg.info) is dict:
-                    self.currentTelemetry[list(msg.info.keys())[0]] = list(msg.info.values())[0]
+                    for k, v in msg.info.items():
+                        self.currentTelemetry[k] = v
                 else:
                     print("Please send telemetry feedback as dict: %s" % (msg.info))
 

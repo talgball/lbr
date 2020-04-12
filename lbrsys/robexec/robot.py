@@ -252,8 +252,9 @@ class Robot(object):
                 elif len(values) == 5:
                     preparedCommand = nav(power(float(values[0]),
                                                 float(values[1])),
-                                          float(values[2]),
-                                          values[3], float(values[4]))
+                                            float(values[2]),
+                                            values[3],
+                                            float(values[4]))
             elif cmd[0:3] == '/a/':
                 angle = cmd[3:]
                 preparedCommand = observeTurn(float(angle))

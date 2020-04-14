@@ -272,7 +272,6 @@ class Robot(object):
 
 
     def prepare(self, cmd):
-        #print "cmd: %s" % (cmd,)
         preparedCommand = cmd
 
         if cmd == 'S' or cmd == 's':

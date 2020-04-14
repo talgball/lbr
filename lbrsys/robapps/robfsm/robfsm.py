@@ -36,8 +36,8 @@ from robcom import robhttp
 
 import csv
 
-from .fsm import StateMachine
-from . import telemetry
+from fsm import StateMachine
+import telemetry
 
 
 class RobStateMachine(StateMachine):

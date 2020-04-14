@@ -195,7 +195,8 @@ class Robot(object):
                 continue
 
             # check to see if the command is external
-            if command and command[0] != '/' and command not in 'Ss':
+            if command and command[0] != '/' and command not in 'Ss' \
+                and 'stop' not in command.lower():
                 if command in self.r.extcmds:
                     try:
                         self.execExt(command)
@@ -222,8 +223,8 @@ class Robot(object):
             run = subprocess.Popen
 
         target = cmd['target']
-        if cmd['target'][0] != '/':
-            target = os.path.join(BASE_DIR, 'lbrsys', cmd['target'])
+        if target[0] != '/':
+            target = os.path.join(BASE_DIR, 'lbrsys', target)
 
         cmd_args = [target]
         if cmd['args'] is not None:
@@ -283,8 +284,25 @@ class Robot(object):
         
         logging.debug("type of cmd '%s' is: %s" % (str(cmd),type(cmd)))
         
-        #if type(cmd) == dict:
-        #    return preparedCommand
+        if type(cmd) is str:
+            cmdWords = cmd.split(' ')
+            if len(cmdWords) == 1 and cmdWords[0].lower() == 'stop':
+                preparedCommand = power(0,0)
+                return preparedCommand
+
+            if len(cmdWords) == 2 and cmdWords[0].lower() == 'stop':
+                cw1 = cmdWords[1]
+                if cw1 in self.extProcesses.keys():
+                    p = self.extProcesses[cw1]
+                    p.terminate()
+                    termResult = p.wait(2)
+                    self.extProcesses.pop(cw1)
+                    print("\tStopped {}, result {}".format(cw1, termResult))
+                    logging.debug("Stopped {}, result {}".format(cw1, termResult))
+                else:
+                    print("\tUnknown stop {}".format(cw1))
+                    logging.debug("Unknown stop {}".format(cw1))
+                return None
 
         if type(cmd) is str and len(cmd) > 3:
             if cmd[0:3] == '/r/':

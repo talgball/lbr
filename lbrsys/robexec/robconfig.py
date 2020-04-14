@@ -29,7 +29,7 @@ import time
 from lbrsys.settings import robot_name
 
 class Robconfig:
-    def __init__(self,dbfile, name=robot_name):
+    def __init__(self, dbfile, name=robot_name):
         self.name = name
         try:
             self.con = sqlite3.connect(dbfile)
@@ -40,14 +40,12 @@ class Robconfig:
         self.cursor = self.con.cursor()
         try:
             robrecords = self.cursor.execute(
-                "select * from robot where name=?", (name,))
-            self.robrecord      = robrecords.fetchone()
-            for k in list(self.robrecord.keys()):
-                # todo - check keys for harm
-                s = "self.%s=self.robrecord['%s']"%(k, k)
-                exec(s)
+                "select * from robot where name=?", (self.name,))
+            self.robrecord = robrecords.fetchone()
+            self.robot_id = self.robrecord['robot_id']
+
         except:
-            print("exception getting robot config")
+            print("Exception getting robot config")
             raise
 
         try:
@@ -65,7 +63,7 @@ class Robconfig:
                     prElement[k] = pr[k]
                 self.processList.append(prElement)              
         except:
-            print("exception getting processes")
+            print("Exception getting processes")
             raise
 
         try:
@@ -80,7 +78,7 @@ class Robconfig:
                     crElement[k] = cr[k]
                 self.channelList.append(crElement)
         except:
-            print("exception getting channels")
+            print("Exception getting channels")
             raise
 
         try:
@@ -90,13 +88,23 @@ class Robconfig:
 
             self.messageDict = {}
             for m in messageRecords:
-                message = (m['language'],m['text'],m['purpose'],m['type'])
+                message = (m['language'], m['text'], m['purpose'], m['type'])
                 self.messageDict[m['name']] = message
         except:
-            print("exception getting messages")
+            print("Exception getting messages")
             raise
 
-    def saveMessageDict(self,filename='./robmsgdict.py'):
+        try:
+            self.extcmds = {}
+            for c in self.cursor.execute("select * from extcmd where robot_id=?",
+                                            (self.robot_id,)):
+                self.extcmds[c['cmd_name']] = c
+        except:
+            print("Exception getting external commands")
+            raise
+
+
+    def saveMessageDict(self, filename='./robmsgdict.py'):
         try:
             dictFile = open(filename, 'w')
         except:

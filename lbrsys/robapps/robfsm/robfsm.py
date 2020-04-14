@@ -32,13 +32,12 @@ import pprint
 from threading import Thread
 
 sys.path.append('../..')
-from robcom import publisher
 from robcom import robhttp
 
 import csv
 
-from fsm import StateMachine
-import telemetry
+from .fsm import StateMachine
+from . import telemetry
 
 
 class RobStateMachine(StateMachine):

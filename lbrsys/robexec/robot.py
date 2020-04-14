@@ -37,7 +37,7 @@ if __name__ == '__main__':
     sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from lbrsys.settings import robot_name, dbfile, robLogFile
+from lbrsys.settings import robot_name, dbfile, robLogFile, BASE_DIR
 from lbrsys import power, nav
 from lbrsys import observeTurn, executeTurn, executeHeading
 from lbrsys import speech, dance, feedback
@@ -66,7 +66,8 @@ class Robot(object):
         logging.info('Configuring robot {0} at {1} .'.format(robot_name, time.asctime()))
 
         self.r = robconfig.Robconfig(dbfile, name)
-        self.r.saveMessageDict()
+        self.execDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.r.saveMessageDict(self.execDir + '/robmsgdict.py')
 
         '''
         The following section is a bit dense.  Here's how it works:
@@ -93,6 +94,7 @@ class Robot(object):
 
         self.channels = {}
         self.processes = {}
+        self.extProcesses = {}
         self.monitorThreads = []
         firstPass = True
 
@@ -130,16 +132,17 @@ class Robot(object):
             # p['channel_descriptions'] = "\n\t".join(d for d in channelDescriptionsForProcess)
             p['channel_descriptions'] = "\n\t".join(channelDescriptionsForProcess)
             firstPass = False
-            
-            self.processes[p['process_id']] = multiprocessing.Process(
-                target=eval(p['target']),
-                name=p['name'],
-                args=p['channels']
-            )
-            print("\nCreated Process: {0} with channels \n\t{1}".format(
-                p['name'],
-                p['channel_descriptions'])
-            )
+
+            if p['protocol'] == 'pylocal':
+                self.processes[p['process_id']] = multiprocessing.Process(
+                    target=eval(p['target']),
+                    name=p['name'],
+                    args=p['channels']
+                )
+                print("\nCreated Process: {0} with channels \n\t{1}".format(
+                    p['name'],
+                    p['channel_descriptions'])
+                )
 
         # todo: merge this into one of the previous loops through the channels
         self.sendChannels = {}
@@ -177,24 +180,62 @@ class Robot(object):
             if len(command) == 0:
                 continue
 
+            if command == 'Shutdown':
+                self.execSend(command)
+                break
+
             # commands starting with ! are sent directly to python interpreter
             if command and command[0] == '!':
                 try:
                     print("command: %s" % (command[1:]))
                     exec(command[1:])
                 except Exception as e:
-                    print("Error executing '%s',%s, %s" %\
+                    print("Error executing '%s',%s, %s" %
                     (command[1:],sys.exc_info()[0],e))
                 continue
-            
+
+            # check to see if the command is external
+            if command and command[0] != '/' and command not in 'Ss':
+                if command in self.r.extcmds:
+                    try:
+                        self.execExt(command)
+                    except Exception as e:
+                        print("Error executing external command: '%s',%s, %s" %
+                              (command, sys.exc_info()[0], e))
+                else:
+                    print("Unknown command: {}".format(command))
+                continue
+
             preparedCommand = self.prepare(command)
             if preparedCommand and self.acceptedCommand(preparedCommand):
                 self.execSend(preparedCommand)
                         
-            if command == 'Shutdown': 
-                break
-       
         self.end()
+
+
+    def execExt(self, command):
+        logging.debug("Robot Exec: Processing external command - {}".format(str(command)))
+        cmd = self.r.extcmds[command]
+        if cmd['blocking']:
+            run = subprocess.run
+        else:
+            run = subprocess.Popen
+
+        target = cmd['target']
+        if cmd['target'][0] != '/':
+            target = os.path.join(BASE_DIR, 'lbrsys', cmd['target'])
+
+        cmd_args = [target]
+        if cmd['args'] is not None:
+            cmd_args.append([cmd['args'].split(' ')])
+
+        result = run(cmd_args, stdin=cmd['stdin'], stdout=cmd['stdout'], stderr=cmd['stderr'])
+        logging.debug("\tResults: {}".format(str(result)))
+
+        if run is subprocess.Popen:
+            self.extProcesses[command] = result
+
+        return result
 
 
     def execSend(self, preparedCommand):
@@ -225,10 +266,11 @@ class Robot(object):
             monitorQ.task_done()
             
             
-    def acceptedCommand(self,command):
+    def acceptedCommand(self, command):
         return True
 
-    def prepare(self,cmd):
+
+    def prepare(self, cmd):
         #print "cmd: %s" % (cmd,)
         preparedCommand = cmd
 
@@ -284,7 +326,7 @@ class Robot(object):
         sys.stderr.flush()
         
         for c in self.r.channelList:
-            if c['direction'] == 'Send':
+            if c['protocol'] == 'JoinableQueue' and c['direction'] == 'Send':
                 self.channels[c['id']].put('Shutdown')
                 print("Shutdown to channel:",str(c['description']),str(c['id']))
                 
@@ -324,6 +366,11 @@ class Robot(object):
         for p, pv in self.processes.items():
             pv.terminate()
             time.sleep(0.2)
+
+        for p in self.extProcesses.values():
+            p.terminate()
+            p.wait(0.2)
+
         print('Terminated processes')
 
         self.r.noteShutdown()

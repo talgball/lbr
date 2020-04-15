@@ -121,6 +121,7 @@ def genericSubscriber(payload):
 
 if __name__ == '__main__':
     robot = None
+    robot_url = None
     user = None
     apitoken = None
 

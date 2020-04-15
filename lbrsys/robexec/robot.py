@@ -228,7 +228,8 @@ class Robot(object):
 
         cmd_args = [target]
         if cmd['args'] is not None:
-            cmd_args.append([cmd['args'].split(' ')])
+            ca = cmd['args'].split(' ')
+            cmd_args = cmd_args + ca
 
         result = run(cmd_args, stdin=cmd['stdin'], stdout=cmd['stdout'], stderr=cmd['stderr'])
         logging.debug("\tResults: {}".format(str(result)))

@@ -28,13 +28,13 @@ import os
 import sys
 import json
 import time
-import pprint
-from threading import Thread
-
-sys.path.append('../..')
-from robcom import robhttp
-
 import csv
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+sys.path.append(os.path.dirname(BASE_DIR))
+
+from robcom import robhttp2
 
 from fsm import StateMachine
 import telemetry
@@ -187,13 +187,13 @@ class RobStateMachine(StateMachine):
         return newState, self.getTelemetry()
 
 
-class FSMExec(robhttp.Client):
+class FSMExec(robhttp2.Client):
     """
     FSMExec class to provide an http interface for interacting
         between the state machine and the robot.
     """
-    def __init__(self, robot=None, stateFileName='autodock.states'):
-        super(FSMExec, self).__init__(robot)
+    def __init__(self, robot=None, robot_url=None, stateFileName='autodock.states'):
+        super(FSMExec, self).__init__(robot, robot_url)
         self.stateFileName = stateFileName
         self.stop = False
         # self.sampleInterval = 0.5
@@ -273,7 +273,8 @@ def genericSubscriber(payload):
     print(str(payload))
 
 
-def main(robot=None, user=None, token=None, stateFileName='autodock.states'):
+def main(robot=None, robot_url=None, user=None, token=None,
+         stateFileName='statesd/autodock.states'):
     """
     main is provided to streamline using this module from
         multiprocessing.Process
@@ -282,7 +283,7 @@ def main(robot=None, user=None, token=None, stateFileName='autodock.states'):
     print(("Initializing State Machine Execution for robot %s with %s" %
           (robot, stateFileName)))
 
-    fsm_client = FSMExec(robot, stateFileName)
+    fsm_client = FSMExec(robot, robot_url, stateFileName)
     fsm_client.setAuthToken(user, token)
     # fsm_client.publisher.addSubscriber(genericSubscriber)
     fsm_client.start()
@@ -292,24 +293,30 @@ def main(robot=None, user=None, token=None, stateFileName='autodock.states'):
 
 if __name__ == '__main__':
     robot = None
+    robot_url = None
     user = None
     apitoken = None
 
     try:
         robot = os.environ['ROBOT']
+        robot_url = os.environ['ROBOT_URL']
         user = os.environ['ROBOT_USER']
         apitoken = os.environ['ROBOT_APITOKEN']
     except Exception as e:
         print(("Error setting up environment:\n%s" %
               str(e)))
 
-    stateFileName = 'autodock.states'
+    stateFileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                        'statesd', 'autodock.states')
 
-    if len(sys.argv) == 3:
-        robot = sys.argv[1]
-        stateFileName = sys.argv[2]
-    elif not robot:
-        print('Usage: robfsm.py <robotname> <statefile>')
+    if len(sys.argv) == 2:
+        stateFileName = sys.argv[1]
+        if stateFileName[0] != '/':
+            stateFileName = os.path.join(os.path.dirname(
+                               os.path.abspath(__file__)), 
+                               'statesd', stateFileName)
+    elif not robot: # todo standardize arg parsing
+        print('Usage: robfsm.py <statefile>')
         sys.exit()
 
-    main(robot, user, apitoken, stateFileName)
+    main(robot, robot_url, user, apitoken, stateFileName)

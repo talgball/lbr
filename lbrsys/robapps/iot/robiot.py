@@ -100,7 +100,8 @@ class RobIoTService(object):
             self.args.verbosity = None  # placeholder, will be set in shadow.py
             # self.args.verbosity = 'Debug'
             self.args.use_websocket = False
-            self.args.client_id = 'samples-client-id'
+            # self.args.client_id = 'samples-client-id'
+            self.args.client_id = self.args.thing_name + '-client-id'
             self.args.shadow_property = 'telemetry'
             self.args.proxy_host = None
             self.args.proxy_port = 8080

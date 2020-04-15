@@ -49,20 +49,22 @@ import json
 import time
 import lirc
 
-sys.path.append('..')
-from robcom import publisher
-from robcom import robhttp
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+
+from robcom import robhttp2
 
 
-class DockSignal(robhttp.Client):
-    def __init__(self, robot=None):
-        super(DockSignal, self).__init__(robot)
+class DockSignal(robhttp2.Client):
+    def __init__(self, robot=None, robot_url=None, user=None, token=None):
+        super(DockSignal, self).__init__(robot, robot_url, user, token)
         self.sockid = lirc.init(robot, blocking=False)
         self.sampleInterval = 0.1
         self.timeToLive = 1.5
         self.stop = False
         self.current = {"dockSignal": {"left": 0, "right": 0, "time": 0}}
         self.setAuthToken(user, apitoken)
+        print("\tdocksignal URL: {}".format(robot_url))
 
 
     def subscriber(self,payload=None):
@@ -126,6 +128,7 @@ if __name__ == '__main__':
         robot = os.environ['ROBOT_DOCK']
         user = os.environ['ROBOT_USER']
         apitoken = os.environ['ROBOT_APITOKEN']
+        robot_url = os.environ['ROBOT_URL'] + '/docksignal'
     except Exception as e:
         print(("Error setting up environment:\n%s" %
               str(e)))
@@ -138,7 +141,7 @@ if __name__ == '__main__':
 
     print("Initializing Dock Signal Manager")
 
-    dockClient = DockSignal(robot)
+    dockClient = DockSignal(robot, robot_url, user, apitoken)
     # dockClient.publisher.addSubscriber(genericSubscriber)
     dockClient.start()
     time.sleep(3)

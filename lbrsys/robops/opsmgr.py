@@ -159,7 +159,8 @@ class Opsmgr(object):
             # nav: power, range, interval
             # navexample = nav(power(0.2,0), 10, 'Forward', 20)
             self.commandQ.put(task.power)
-            self.rangecq.put(observeRange(task))
+            if task.range != 0:
+                self.rangecq.put(observeRange(task))
 
         if type(task) is mpuData:
             self.mpuData = task

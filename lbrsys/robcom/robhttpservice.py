@@ -140,8 +140,8 @@ class RobHandler(BaseHTTPRequestHandler):
                              format % args))
 
     def handle_power(self, msgD):
-
         command = None
+        
         # todo msgD type checking
         if 'heading' in msgD and msgD['heading'] != '':
             command = "/h/%.1f" % float(msgD['heading'])
@@ -151,19 +151,23 @@ class RobHandler(BaseHTTPRequestHandler):
 
         elif 'level' in msgD and msgD['level'] != '':
             command = "/r/%.2f/%d" % (float(msgD['level']), int(msgD['angle']))
+            print("POWER msgD: {}".format(str(msgD)))
+            level = float(msgD['level'])
+            angle = float(msgD['angle'])
+            range = 0
+            sensor = 'Forward'
+            duration = 0
 
-            # todo debug the default sensor case
             if 'range' in msgD and msgD['range'] != '':
-                command += "/%d" % (int(msgD['range']))
-                if 'sensor' in msgD and msgD['sensor'] != '':
-                    command += "/%s" % msgD['sensor']
-                else:
-                    command += "Forward"
+                range = int(msgD['range'])
 
-                if 'duration' in msgD and msgD['duration'] is not None:
-                    command += "/%.1f" % (float(msgD['duration']))
-                else:
-                    command += "/0"
+            if 'sensor' in msgD and msgD['sensor'] != '':
+                sensor = msgD['sensor']
+
+            if 'duration' in msgD and msgD['duration'] is not None:
+                duration = int(msgD['duration'])
+
+            command = "/r/%.2f/%d/%d/%s/%d" % (level, angle, range, sensor, duration)
 
             if msgD['level'] > 0:
                 self.server.motors_powered = time.time()
@@ -171,6 +175,7 @@ class RobHandler(BaseHTTPRequestHandler):
                 self.server.motors_powered = 0
 
         if command is not None:
+            # print("\tSENDING: {}".format(command))
             self.server.sendQ.put(command)
             self.send_response(200)
         else:

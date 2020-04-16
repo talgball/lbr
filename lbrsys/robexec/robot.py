@@ -310,11 +310,17 @@ class Robot(object):
                 if len(values) == 2:
                     preparedCommand = power(float(values[0]), float(values[1]))
                 elif len(values) == 5:
-                    preparedCommand = nav(power(float(values[0]),
-                                                float(values[1])),
-                                            float(values[2]),
-                                            values[3],
-                                            float(values[4]))
+                    #('nav', 'power range sensor interval')
+                    level = float(values[0])
+                    angle = float(values[1])
+                    range = float(values[2])
+                    sensor = values[3]
+                    interval = float(values[4])
+                    preparedCommand = nav(power(level, angle), range, sensor, interval)
+                else:
+                    print("Error parsing power command: {}".format(cmd))
+                    logging.error("Error parsing power command: {}".format(cmd))
+
             elif cmd[0:3] == '/a/':
                 angle = cmd[3:]
                 preparedCommand = observeTurn(float(angle))
@@ -350,7 +356,12 @@ class Robot(object):
                 
         # give the shutdown messages time to execute
         time.sleep(1)
-       
+
+        print("Terminating external processes")
+        for p in self.extProcesses.values():
+            p.terminate()
+            p.wait(0.2)
+
         '''
         # todo: debug why the queues (especially #2) hangs
         # hint - check on the order in which the Shutdowns are sent relative
@@ -380,14 +391,10 @@ class Robot(object):
 
         # For now, terminate the processes.
         # Until hanging on join is resolved.
-        print("Terminating processes")
+        print("Terminating robot processes")
         for p, pv in self.processes.items():
             pv.terminate()
             time.sleep(0.2)
-
-        for p in self.extProcesses.values():
-            p.terminate()
-            p.wait(0.2)
 
         print('Terminated processes')
 

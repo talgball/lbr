@@ -11,12 +11,12 @@ start,Initial Orientation,,,,,,,,,,,,,,,,,95,,Way Point 1
 ,Approaching,< 330,,,,,,,,,,,,,,,,336,,Approaching
 ,Approaching,> 345,,,,,,,,,,,,,,,,336,,Approaching
 ,Approaching,,> 215,,,,,,,,,,,,,,,,,Dock Failed
-,Dock Orientation,,39:41,,,,,,,,,,,,,,,178,,Signal Lock
+,Dock Orientation,,39:41,,,,,,,,,,,,,,,180,,Signal Lock
 ,Dock Orientation,,< 39,,,,,,,,,,0.2,180,40,Forward,,,,Dock Orientation
 ,Dock Orientation,,> 41,,,,,,,,,,0.2,0,40,Forward,,,,Dock Orientation
-,Signal Lock,175:185,,,,,,,,1,1,,0.25,180,,,5,,,Contact
-,Signal Lock,< 175,,,,,,,,,,,,,,,,178,,Signal Lock
-,Signal Lock,> 185,,,,,,,,,,,,,,,,178,,Signal Lock
+,Signal Lock,176:184,,,,,,,,1,1,,0.25,180,,,5,,,Contact
+,Signal Lock,< 176,,,,,,,,,,,,,,,,180,,Signal Lock
+,Signal Lock,> 184,,,,,,,,,,,,,,,,180,,Signal Lock
 ,Contact,,,,,,<= -5.1,<= -5.1,,1,1,,0,0,,,,,,Verifying
 ,Contact,,,< 20,,,0,0,>= 12.8,1,1,,,,,,,,,Verifying
 ,Contact,,,>=20,,,0,0,,1,1,,,,,,,,,Signal Lock

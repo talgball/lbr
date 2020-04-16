@@ -141,7 +141,7 @@ class RobHandler(BaseHTTPRequestHandler):
 
     def handle_power(self, msgD):
         command = None
-        
+
         # todo msgD type checking
         if 'heading' in msgD and msgD['heading'] != '':
             command = "/h/%.1f" % float(msgD['heading'])

@@ -152,6 +152,9 @@ class RobStateMachine(StateMachine):
                         leftAmps = t['Amps Left']
                         rightAmps = t['Amps Right']
 
+                        # todo note that httpservice heartbeat might timeout before amps 0
+                        #   even if duration has not passed.  Mainly issue when amps reading
+                        #   is being relied upon as part of the telemetry input
                         if leftAmps == 0 and rightAmps == 0:
                             break
                         else:

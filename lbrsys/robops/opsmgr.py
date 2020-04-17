@@ -157,10 +157,14 @@ class Opsmgr(object):
 
         if type(task) is nav:
             # nav: power, range, interval
-            # navexample = nav(power(0.2,0), 10, 'Forward', 20)
             self.commandQ.put(task.power)
+            # todo handle the case of having both range and duration wrt to priorities and cross management
             if task.range != 0:
                 self.rangecq.put(observeRange(task))
+            if task.interval != 0:
+                i = threading.Timer(task.interval, self.intervalStopCallback,
+                                    kwargs={'task': task})
+                i.start()
 
         if type(task) is mpuData:
             self.mpuData = task
@@ -328,6 +332,13 @@ class Opsmgr(object):
                 logging.debug("Error reporting mpu data: %s" % (str(e)))
 
 
+    def intervalStopCallback(self, task):
+        msg = "Stopping motors after interval %.3f" % task.interval
+        print(msg)
+        logging.info(msg)
+        self.commandQ.put(power(0,0))
+
+
     def start(self):
         printRange = True
         # minLoopTime = 0.050 # todo look at variablizing minLoopTime to be able to speed up or slow down as needed
@@ -364,7 +375,7 @@ class Opsmgr(object):
             self.checkController()
             dt = robtimer() - loopStartTime
             if dt > 1.0:
-                print("it's taken %f after checking controller" % (dt,))
+                print("Long operations loop: %f after checking controller" % (dt,))
 
             if self.autoAdjust:
                 self.adjustTask()
@@ -390,7 +401,7 @@ class Opsmgr(object):
 
     def end(self):
         self.devices['motorController'].closeController()
-        self.devices['motorController'].closeController()
+        # self.devices['motorController'].closeController()
 
         # self.devices['motorController'].cFront.closeController()
         # self.devices['motorController'].cRear.closeController()

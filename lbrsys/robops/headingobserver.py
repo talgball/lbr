@@ -107,7 +107,7 @@ class HeadingObserver(object):
             self.observed = True
             self.qOut.put(('Observed', curHeading, self.totalTime))
 
-            reportStr = "Heading observed: %f, elapsed: %f, updates: %d"
+            reportStr = "Heading observed: %.1f, elapsed: %.3f, updates: %d"
             logging.debug(reportStr % \
                           (curHeading, self.totalTime, self.totalUpdates, ))
             print(reportStr % \
@@ -119,14 +119,14 @@ class HeadingObserver(object):
             self.observed = False
             self.qOut.put(('Missed', curHeading, self.totalTime))
 
-            reportStr = "Heading missed: %f, elapsed: %f, updates: %d"
+            reportStr = "Heading missed: %.1f, elapsed: %.3f, updates: %d"
             logging.debug(reportStr % \
                           (curHeading, self.totalTime,
                            self.totalUpdates, ))
             print(reportStr % \
                           (curHeading, self.totalTime,
                            self.totalUpdates, ))
-            print("Completed at", time.time())
+            print("Completed at", time.asctime())
 
 
         self.dLF.write('%d\t%2.2f\t%2.2f\t%2.2f\t%d\t%.4f\t%.4f\t%.4f\n' %\

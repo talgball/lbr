@@ -89,6 +89,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
             logging.error("Exception securing http server: {}".format(str(e)))
 
 
+    # todo simplify heartbeat management using threading.Timer
     def set_heartbeat(self):
         if self.motors_powered > 0 and not self.heartbeat:
             self.heartbeat_thread = threading.Thread(target=self.check_heartbeat)
@@ -102,7 +103,8 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
         if self.motors_powered > 0 and time.time() - self.telemetry_sent > pulse:
             self.sendQ.put('/r/0/0')
             self.motors_powered = 0
-            logging.debug("heartbeat timeout - cutting motor power")
+            logging.debug("Heartbeat timeout - cutting motor power")
+            print("Hearbeat timeout - cutting motor power at %s" % time.asctime())
         else:
             # print('\ttelemetry age: %.3f' % (time.time() - self.telemetry_sent))
             self.set_heartbeat()
@@ -150,8 +152,7 @@ class RobHandler(BaseHTTPRequestHandler):
             command = "/t/%.1f" % float(msgD['turn'])
 
         elif 'level' in msgD and msgD['level'] != '':
-            command = "/r/%.2f/%d" % (float(msgD['level']), int(msgD['angle']))
-            print("POWER msgD: {}".format(str(msgD)))
+            # print("POWER msgD: {}".format(str(msgD)))
             level = float(msgD['level'])
             angle = float(msgD['angle'])
             range = 0
@@ -164,7 +165,7 @@ class RobHandler(BaseHTTPRequestHandler):
             if 'sensor' in msgD and msgD['sensor'] != '':
                 sensor = msgD['sensor']
 
-            if 'duration' in msgD and msgD['duration'] is not None:
+            if 'duration' in msgD and msgD['duration'] != '':
                 duration = int(msgD['duration'])
 
             command = "/r/%.2f/%d/%d/%s/%d" % (level, angle, range, sensor, duration)
@@ -188,10 +189,10 @@ class RobHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         buffer = json.dumps(self.server.currentTelemetry).encode()
-        # json.dump(buffer, self.wfile)
         self.wfile.write(buffer)
 
         if self.server.motors_powered > 0:
+            # todo track heartbeats on a per client basis, otherwise client 2 could accidentally keep alive client 1
             self.server.telemetry_sent = time.time()
             self.server.set_heartbeat()
 

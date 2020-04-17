@@ -71,8 +71,8 @@ class RangeObserver(object):
 
         logging.debug("Initialized Range Observer for range %s, sensor %s" %
                       (self.target, self.sensor))
-        print("Initialized Observer for range %s, sensor %s at %.4f" % \
-              (self.target, self.sensor, time.time()))
+        print("Initialized Observer for range %s, sensor %s at %s" % \
+              (self.target, self.sensor, time.asctime()))
 
 
     def rangeAchieved(self, current, target):
@@ -127,7 +127,7 @@ class RangeObserver(object):
             print(reportStr % \
                           (currange, self.totalTime,
                            self.totalUpdates, ))
-            print("Completed at", time.time())
+            print("Completed at", time.asctime())
 
 
         self.dLF.write('%d\t%2.2f\t%2.2f\t%.4f\t%.4f\t%.4f\n' %\

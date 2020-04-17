@@ -28,6 +28,7 @@ from time import time as robtimer # legacy naming issue
 import time
 
 from lbrsys import power, nav
+from lbrsys.settings import rangeobserverLogFile
 
 
 class RangeObserver(object):
@@ -52,7 +53,7 @@ class RangeObserver(object):
         self.totalTime      = 0
         self.observed       = False
         self.missed         = False
-        self.dLF            = open('./rangeReadings.log', 'w')
+        self.dLF            = open(rangeobserverLogFile, 'w')
         self.dLF.write("N\ttarget\trange\tdeltat\ttotalt\n")
         self.testMode       = testMode
 

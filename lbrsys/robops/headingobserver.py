@@ -26,6 +26,7 @@ from time import time as robtimer # legacy naming issue
 import time
 
 from lbrsys import mpuData
+from lbrsys.settings import headingobserverLogFile
 from .opsmgr import calcDirection
 
 class HeadingObserver(object):
@@ -49,7 +50,7 @@ class HeadingObserver(object):
         self.totalTime      = 0
         self.observed       = False
         self.missed         = False
-        self.dLF            = open('./headingReadings.log','w')
+        self.dLF            = open(headingobserverLogFile,'w')
         self.dLF.write("N\ttarget\theading\tlastd\tdir\tt\tdeltat\ttotalt\n")
         self.testMode       = testMode
 

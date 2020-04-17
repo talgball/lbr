@@ -42,7 +42,7 @@ if proc.name  == 'Speech Services':
 
 
 class SpeechService:
-    def __init__(self,commandQ=None,broadcastQ=None):
+    def __init__(self, commandQ=None, broadcastQ=None):
         self.commandQ   = commandQ
         self.broadcastQ = broadcastQ
         self.tts = robtts.Robtts()
@@ -60,7 +60,7 @@ class SpeechService:
     def start(self):
 
         self.tts.sayStdNow("Hello")
-        self.tts.sayNow("Hello")
+        # self.tts.sayNow("Hello")
 
         while True:
             # don't need the more sophisticated loop since this is essentially

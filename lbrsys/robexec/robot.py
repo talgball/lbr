@@ -66,8 +66,7 @@ class Robot(object):
         logging.info('Configuring robot {0} at {1} .'.format(robot_name, time.asctime()))
 
         self.r = robconfig.Robconfig(dbfile, name)
-        self.execDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.r.saveMessageDict(self.execDir + '/robmsgdict.py')
+        self.r.saveMessageDict(os.path.join(BASE_DIR, 'lbrsys', 'robcom', 'robmsgdict.py'))
 
         '''
         The following section is a bit dense.  Here's how it works:

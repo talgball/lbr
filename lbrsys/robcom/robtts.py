@@ -24,7 +24,7 @@ __version__ = "1.0"
 
 import pyttsx3
 
-from robcom import robttsdict
+from robcom.robmsgdict import messageDict
 
 from robcom import publisher
 
@@ -39,45 +39,52 @@ class Robtts:
     # at some point.
     #More importantly, it gives apps the chance to build text from
     #
-    def getText(self,msgKey,language):
+    def getText(self, msgKey, language):
         try:
-            text = robttsdict.stdDict[language][msgKey]
+            text = messageDict[msgKey][language]['text']
         except:
             print("Error finding standard message from key:", msgKey)
             text = ""
         return text
-        
-    def sayNow(self,text):
+
+
+    def sayNow(self, text):
         self.engine.say(text)
         self.engine.runAndWait()
         self.speechPub.publish(str(text))
 
-    def say(self,text):
+
+    def say(self, text):
         self.engine.say(text)
         self.speechPub.publish(str(text))
 
-    def sayStdNow(self,msgKey,language=None):
+
+    def sayStdNow(self,msgKey, language='English'):
         if not language:
             language = self.language
-        text = self.getText(msgKey,language)
+        text = self.getText(msgKey, language)
         if text:
             self.sayNow(text)
 
-    def sayStd(self,msgKey,language=None):
+
+    def sayStd(self, msgKey, language='English'):
         if not language:
             language = self.language
-        text = self.getText(msgKey,language)
+        text = self.getText(msgKey, language)
         if text:
             self.say(text)
 
 
-def main(testSentences,tts=None):
+def main(testSentences, tts=None):
     if not tts:
         tts = Robtts()
+
     for s in testSentences:
-        tts.sayNow(s)
-    for mk in robttsdict.stdDict['English']:
-        tts.sayStd(mk)
+        # tts.sayNow(s)
+        print(s)
+
+    for mk in messageDict.keys():
+        tts.sayStdNow(mk, 'English')
 
 
 #externalize later
@@ -88,4 +95,4 @@ testSentences  = ["Hello, world!",
 
 if __name__ == '__main__':
     tts = Robtts()
-    main(testSentences,tts)
+    main(testSentences, tts)

@@ -84,6 +84,7 @@ class Robconfig:
 
         try:
             # message list is not robot-specfic for now
+            # todo normalize the message data model accross language
             messageRecords = self.cursor.execute(
                 "select * from message order by name")
 

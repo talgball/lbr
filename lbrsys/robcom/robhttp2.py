@@ -90,7 +90,7 @@ class Client(object):
 
         try:
             response = requests.get(self.robot_url + '/telemetry', data='\r\n',
-                                    headers=self.headers, verify=self.robot_ca)
+                                    headers=self.headers, verify=False)
 
         except Exception as e:
             print("Get Exception: %s" %(e,), file=sys.stderr)
@@ -121,7 +121,8 @@ class Client(object):
 
             try:
                 self.response = requests.post(self.robot_url, data=payload + '\r\n',
-                                              headers=self.headers, verify=self.robot_ca)
+                                              headers=self.headers, verify=False)
+                # todo get certificate verification working for post and for get, uses robot_ca
 
             except Exception as e:
                 print("Post Exception: %s" %(e,), file=sys.stderr)
@@ -170,9 +171,14 @@ if __name__ == '__main__':
     c = Client(robot, robot_url, user, token)
     c.publisher.addSubscriber(genericSubscriber)
 
+    print("Post tests:")
     for n in range(5):
         c.post(power(0., 0))
         print("n: %d" % n)
+
+    print("Get tests:")
+    for n in range(5):
+        print("%d: %s" % (n, str(c.get())))
 
     i = input("Press Enter to Shutdown: ")
     c.post('Shutdown')

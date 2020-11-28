@@ -40,6 +40,9 @@ currently in an experimental state, it has not yet been packaged into a standard
 can clone or download this repository or any of its components, subject to the included Apache 2 license agreement and
 notices.
 
+## Demonstration Videos
+
+
 ## Software Overview
 The embedded portion of the lbr software architecture is organized into 4 packages and an extensible collection of 
 additional packages called, "applications".  There is also an external web client application and, at this writing, 
@@ -59,16 +62,52 @@ Unit testing for each module is behind the
  
     if __name__ == __main__:
 
-statement at the bottom of the module.  The main entrypoint module, robot.py, is an exception to this rule.  The others
-are not executed as mains at runtime.
+statement near the bottom of the module.  The main entry point module, robot.py, is an exception to this rule.  
+The others are not executed as mains at runtime except during unit testing.
 
 
 ### Executive
-The executive package provides for configuring the robot at run time and commands the rest of the system.  A 
-configuration module uses a sqllite database to store primary configuration information as metadata for significant 
+The executive package provides for configuring the robot at run time and commands the rest of the system.  It also 
+provides for shutdown operations.
+
+A configuration module uses a sqllite database to store primary configuration information as metadata for significant 
 capabilities of the robot.  The configuration process reads the database and arranges for indicated processes to be 
-launched and connected together with various communications methods, typically python joinable queues.  Using this 
-approach, the robot itself is 
+launched and connected together with various communications methods, typically python joinable queues, as specified in
+the metadata.  Using this approach, the robot itself is "softly modeled" and can be significantly modified and extended
+often without changing the existing code. 
+
+After launching with the robot command, the system provides a command console in a terminal window.  Three types of 
+commands are supported at the console: builtin, external and python.  Builtin commands are as follows:
+* /r/power/angle - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees.
+* /r/power/angle/range/sensor/interval - Run the motors at the given power level and angle subject to constraints:
+  * range - Measured by the indicated sensor must be greater than the value specified, between 0 and 769 cm.
+  * sensor - Indicate which of forward, back, left or right range sensors to measure against the constraint.
+  * interval - Stop the motors after an interval in seconds has expired, regardless of the range constraint.
+* S or s - Shortcut to immediately stop the motors.  Equivalent to /r/0/0.
+* /a/angle - Report that the robot has turned by the indicated number of degrees.
+* /t/angle - Turn the robot by the indicated number of degrees, 0 to +/- 360.  Positive angles turn clockwise.
+* /h/heading - Turn the robot to the indicated compass heading.
+* /s/text - Convert indicated text to speech and play over default audio output. 
+* /d/song - Dance to the indicated song.  (Command no longer supported in current version.)
+* Shutdown - Shutdown the lbr software system
+
+Note that when operating the robot from a client, such as the web application, these commands derived from indications 
+expressed in the user interface and supplied automatically to the executive module for processing.  The command console
+provides a manual means of controlling the robot without a client and is also useful during development and testing. 
+
+External commands are added to the executive based on configurations in the metadata.  Typically, a command string 
+and optional arguments are mapped to an entry point which is launched in a separate process on invocation.  Currently,
+The following external commands are supported:
+*  navcam - Launch the navigation camera application, which is further described below in the __Applications__ section.
+*  docksignal - Launch the listener for infrared signals from the robot's charging dock to aid in docking navigation.
+*  autodock - Launch the automatic docking application to guide the robot into it's charging dock.
+
+Hooks for command acceptance and further processing are stubbed out in the executive.  The idea behind this construct
+is to provide a place in the architecture to connect to higher level considerations on whether to deem some commands as
+acceptable or not prior to execution.
+
+Finally, any console command line that starts with __!__ is passed to the python interpreter literally for attempted
+execution.  The interpreter will have access to the namespace of the executive process. 
 
 
 ### Communications
@@ -76,8 +115,7 @@ approach, the robot itself is
 ### Drivers
 ### Applications
 
-
-## Demonstration Videos
+### Environment and setup
 
 
 ## Support and Collaboration

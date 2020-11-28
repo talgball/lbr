@@ -1,6 +1,6 @@
 # lbr
 Distributed Robot Operating System Architecture and Design Experiments
 
-![System and Architecture](/docs/images/2020/2020lbrsystem.png)
+![System and Architecture](https://github.com/talgball/lbr/blob/master/docs/images/2020/2020lbrsystem.png)
 
 

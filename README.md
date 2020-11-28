@@ -68,7 +68,7 @@ The others are not executed as mains at runtime except during unit testing.
 
 ### Executive
 The executive package provides for configuring the robot at run time and commands the rest of the system.  It also 
-provides for shutdown operations.
+provides for startup and shutdown operations.
 
 A configuration module uses a sqllite database to store primary configuration information as metadata for significant 
 capabilities of the robot.  The configuration process reads the database and arranges for indicated processes to be 
@@ -78,7 +78,8 @@ often without changing the existing code.
 
 After launching with the robot command, the system provides a command console in a terminal window.  Three types of 
 commands are supported at the console: builtin, external and python.  Builtin commands are as follows:
-* /r/power/angle - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees.
+* /r/power/angle - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees 
+from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180 is straight back.
 * /r/power/angle/range/sensor/interval - Run the motors at the given power level and angle subject to constraints:
   * range - Measured by the indicated sensor must be greater than the value specified, between 0 and 769 cm.
   * sensor - Indicate which of forward, back, left or right range sensors to measure against the constraint.

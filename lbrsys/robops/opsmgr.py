@@ -1,5 +1,5 @@
 """
-opsmgr.py - operations manager - handle intractions between the robot
+opsmgr.py - operations manager - handle interactions between the robot
     and physical devices including sensors and motors.  Manage the
     main operations loop for the system
 """

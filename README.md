@@ -70,18 +70,21 @@ The others are not executed as mains at runtime except during unit testing.
 The executive package provides for configuring the robot at run time and commands the rest of the system.  It also 
 provides for startup and shutdown operations.
 
-A configuration module uses a sqllite database to store primary configuration information as metadata for significant 
+A configuration module uses a sqllite database to store primary configuration information as metadata to specify 
 capabilities of the robot.  The configuration process reads the database and arranges for indicated processes to be 
 launched and connected together with various communications methods, typically python joinable queues, as specified in
-the metadata.  Using this approach, the robot itself is "softly modeled" and can be significantly modified and extended
-often without changing the existing code. 
+the metadata.  The usual pattern is to create two joinable queues between connected processes.  One of them is used 
+to send command messages, and the other one is used to convey response information such as telemetry back to the 
+commanding process.  Using this approach, the robot itself is "softly modeled" and can be significantly modified and 
+extended, often without changing the existing code, and could even "evolve" it's capabilities at runtime. 
 
 After launching with the robot command, the system provides a command console in a terminal window.  Three types of 
 commands are supported at the console: builtin, external and python.  Builtin commands are as follows:
 * __/r/power/angle__ - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees 
 from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180 is straight back.
 * __/r/power/angle/range/sensor/interval__ - Run the motors at the given power level and angle subject to constraints:
-  * *range* - Distance measured by the indicated sensor must be greater than the value specified, between 0 and 769 cm.
+  * *range* - Distance measured by the indicated sensor must remain greater than the value specified, between 0 and 769cm,
+  or the motors are stopped.
   * *sensor* - Indicate which of forward, back, left or right range sensors to measure against the constraint.
   * *interval* - Stop the motors after the interval in seconds has expired, regardless of the range constraint.
 * __S or s__ - Shortcut to immediately stop the motors.  Equivalent to /r/0/0.
@@ -132,16 +135,116 @@ this module to flexibly connect with the http service and thereby the rest of th
 * __speech__ - A wrapper around __pyttsx3__ and an adaptor to connect speech as a service to the system. 
 * __dock signal__ - An interface to __lirc__ to capture and process infrared signals from the charging dock as aids to 
 navigation during docking.
-* __telemetry__ - Prototype module for generalizing telemetry processing.  Not currently in use.  A more advanced telemetry 
-processing capability is implemented in the state machine package.
+* __telemetry__ - Prototype module for generalizing telemetry processing.  Not currently in use.  A more advanced 
+telemetry processing capability is implemented and utilized in the state machine package.
 * __zoom manager__ - zoom is currently used for the video conferencing function in telepresence and has been typically 
 managed manually.  This module will wrap the management of zoom communications and integrate and automate the management
 process with the robot system.  This module is under development and not currently released.
 
 
 ### Operations
+The operations package handles interactions between the robot systems and physical devices, including sensors and 
+motors, and it provides the main operations loop for the system.  Communications with this package are implemented
+as specified during configuration utilizing joinable queues.   
+* __ops manager__ - The operations manager processes all commands that move the robot, and it gathers and communicates
+telemetry data. It operates the main system loop.  The minimum loop time is configurable and is currently set at 10ms.  
+If the system finishes all tasks executable in the current loop, the ops manager will wait until the remainder of the 
+minimum loop time expires before starting the next loop iteration.  Typically, loop tasks are completed within a few
+miliseconds.  This approach reduces cpu utilization and realistically aligns with the operating paradigm of the current
+robot, i.e. a wheeled machine operating in a residential environment.  A much shorter loop time would be needed for a 
+flying robot, for example.  The ops manager keeps and logs statistics on operation timings to enable further tuning of 
+the system.  Excessively long loops, for example, typically indicate an error condition or bug has been encountered.
+* __movement__ - The movement modules, notably __movepa.py__, translates the power and angle movement directives into 
+precise parameters to communicate to the motor controller.  The translation algorithm can be adjusted based on the 
+configuration of the robot motors and steering mechanisms.  The current robot employs tank like steering, as it has 
+left and right motors that operate independently.
+* __motion processing__ - Telemetry information is gathered from the 9 axis motion processing system and combined 
+with other information for use in adjusting operations and to communicate across the system.
+* __range__ - Operates the array of 4 ultrasonic range sensors and reports the distances forward, back, left and right
+to the nearest object in each of those directions.
+* __observers__ - Observers look for a particular condition to occur based on sensor data and report their findings 
+back to the operations manager.  For example, a command to turn the robot by 45 degrees would launch a gyroscope 
+observer to watch the rate of spin over a series of short time intervals to calculate the amount of turning that the
+robot has experienced since the command was issued.  When the observer concludes that 45 degrees of turn has occurred,
+it signals the ops manager to stop the motors.
+* __ops rules__ - The rules system is consulted when the ops manager is processing a movement command to determine if
+the movement is safe or should be adjusted for local conditions.  For example, when the robot is approaching an object,
+the rules reduce the speed of the robot, regardless of the currently commanded speed, and when a minimum distance is 
+reached, the robot automatically stops.  Note that currently only a forward range rule is implemented.
+
+
 ### Drivers
+The drivers package contains a collection of modules for interfacing physical devices to the lbr system.  Note that they
+are python modules operating in user space, as opposed to typical low level kernel mode drivers.  In practice these
+drivers sit on top of their underlying operating system counterparts.  For example, if a device is connected to the 
+system via USB port, the operating system's serial driver implements the underlying interface, and the lbr python driver
+uses the serial interface to communicate semantically appropriate information between the device and the ops manager or
+other interested processes.  These modules might be useful on a standalone basis for people who happen to have these
+particular or similar devices and are in need of python drivers.
+
+* __motors__ - A driver for the Roboteq SDC2130 2X20Amp motor controller is provided.  This driver communicates over USB 
+using Roboteq's proprietary protocol to manage motor operations and report on electrical conditions, including battery 
+voltage and the amount of current flowing through the motors.  The driver also implements a master feature toggle to
+enable or disable motor operations.  When disabled, the driver does all of it's normal operations except for actually 
+running the motors.  This toggle is useful during development and debugging, especially when there are potential safety
+concerns when a paricular operation is being developed.
+* __ultrasonic rangers__ - A driver to communicate over USB with a Parallax P8X32 microcontroller that has been 
+programmed to operate an array of 4 MaxBotix MB1220 ultrasonic range sensors.  A package of readings is gathered on 
+request and provided to the range operator running at the request of the operations manager.  The sensors gather a set of 
+readings 10 times per second, and the range operator is set to request the data at the same rate.  Provisions were 
+made in the software to support a 5th sensor to check for bottom distance, in case for example, the robot is approaching
+a staircase, but that sensor is not installed in the current robot.  
+* __9 axis mpu__ A driver to communicate over the i2c bus with an InvenSense MPU9150 9 axis motion processing unit. The
+unit contains a 3 axis gyroscope, accelerometer and magnetometer.  Readings are gathered at the request of motion 
+processing operations at the request of the operations manager.  The mpu9150 is a complex device, and careful study of 
+its datasheet and other documents is required to operate it.  This driver configures and 
+operates the device according to the manufacturer's specifications and provides the data in a single, timestamped json 
+structure.  In addition to the 9 raw data streams plus the temperature reading, the driver calculates the compass heading 
+in degrees from the magnetometer readings.  Note that the driver does not tilt compensate the magnetometer readings 
+because this robot typically operates in a level, 2 dimensional plane.  The tilt compensation calculation is on the todo 
+list.  In order to retrieve accurate magnetometer readings, hard and soft iron compensation might be needed.  A test 
+procedure is referenced in the code. The current particular robot required only hard iron adjustments, which were 
+calculated last in 2019.  Note that InvenSense does provide sdk's for driver development
+for more typical projects, but a python version was needed in this case.  The device contains additional proprietary 
+features for further onboard processing of the data streams to offload system cpu resources, and those were not acquired.
+* __battery__ - A simple driver to map voltage readings from a 12 Volt, 35 Amp-Hour Absorbed Glass Mat (AGM) battery 
+into a state of charge table and report the ongoing status to interested processes, via the ops manager in this case.
+* __av__ - A wrapper package to access audio visual capabilities of a Raspberry Pi 3 GPU.  This module is incomplete and
+not in significant use currently.
+* __mcu__ - For reference, the firmware source for the Parallax P8X32 MCU that is used to drive the range sensors is 
+provided.  It's written in their proprietary spinn language.  Subsequently, C libraries were provided, but this driver
+has not been re-written to leverage them yet.
+
+
 ### Applications
+Applications are packages that utilize and/or extend the lbr system. 
+
+* __navcam__ - A lightweight module to stream mjpeg video from the Raspberry Pi Camera module to navigation clients over 
+http based on the work by Dave Jones.
+* __state machine__ - A general purpose, finite state machine application to operate lbr.  Complex behaviors that can 
+be modeled as finite state machines can be implemented using this application by providing a state transition table as 
+a csv file with the prescribed set of columns.  The state machine follows the table sequentially outputting the 
+specified commands to lbr and collecting the telemetry package back as inputs to evaluate for the next step. The state
+table specifies the conditions required to go on to any number of next states.  The format of the conditions supports
+user specified tolerances for each condition.  For example, if a desired range is 40cm, a user might specify that ranges
+from 39 to 41cm are acceptable.  Tolerance management capabilities are key elements for operating complex systems. 
+Further, the state machine does not require specific knowledge of a particular telemetry package.  It searches the package 
+presented for the information required to match its target conditions regardless of the hierarchical structure.  As a 
+robot implements additional sensors and data streams, the state machine can immediately utilize them based on new
+state tables.  The initial example usage of the application is the automatic docking procedure.  When the robot is
+in the room with the docking station, the autodock state table is executed to autonomously pilot the robot to the dock
+and verify that it is successfully being charged.  With this abstracted, csv driven approach, the state machine could 
+serve as a type of "muscle memory" for behaviours that are complex but not necessarily intelligent on their own.  In 
+the future, coupling this capability with an AI that could design new behaviors and present them to the 
+state machine would mean that the robot could immediately "learn" new the behaviors dynamically without code changes.
+* __IoT__ - An adaptation and implementation of an Amazon AWS sample program to facilitate communications with an 
+AWS IoT Core Thing Device Shadow.  Telemetry data is reported to the shadow, and desired states are retrieved from 
+the shadow.  Commanding the motors from the desired state information has not yet been tested.  This application was
+developed in mid 2020 and is an exciting new avenue for the project.  The project predated Amazon's IoT services, and
+integrating with them would simplify any eventual production deployment and generally accelerate access to cloud based
+capabilities.  In many ways, IoT exemplifies the distributed  architecture concepts that the project was founded upon.
+
+
 
 ### Environment and setup
 

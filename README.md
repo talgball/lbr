@@ -81,14 +81,14 @@ commands are supported at the console: builtin, external and python.  Builtin co
 * /r/power/angle - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees 
 from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180 is straight back.
 * /r/power/angle/range/sensor/interval - Run the motors at the given power level and angle subject to constraints:
-  * range - Measured by the indicated sensor must be greater than the value specified, between 0 and 769 cm.
+  * range - Distance measured by the indicated sensor must be greater than the value specified, between 0 and 769 cm.
   * sensor - Indicate which of forward, back, left or right range sensors to measure against the constraint.
-  * interval - Stop the motors after an interval in seconds has expired, regardless of the range constraint.
+  * interval - Stop the motors after the interval in seconds has expired, regardless of the range constraint.
 * S or s - Shortcut to immediately stop the motors.  Equivalent to /r/0/0.
-* /a/angle - Report that the robot has turned by the indicated number of degrees.
+* /a/angle - Report when the robot has turned by the indicated number of degrees.
 * /t/angle - Turn the robot by the indicated number of degrees, 0 to +/- 360.  Positive angles turn clockwise.
 * /h/heading - Turn the robot to the indicated compass heading.
-* /s/text - Convert indicated text to speech and play over default audio output. 
+* /s/text - Convert indicated text to speech and play it over default audio output. 
 * /d/song - Dance to the indicated song.  (Command no longer supported in current version.)
 * Shutdown - Shutdown the lbr software system
 
@@ -104,19 +104,48 @@ The following external commands are supported:
 *  autodock - Launch the automatic docking application to guide the robot into it's charging dock.
 
 Hooks for command acceptance and further processing are stubbed out in the executive.  The idea behind this construct
-is to provide a place in the architecture to connect to higher level considerations on whether to deem some commands as
-acceptable or not prior to execution.
+is to provide a place in the architecture to connect to higher level rules or evaluation systems to determine whether 
+some commands are acceptable or not prior to execution.
 
 Finally, any console command line that starts with __!__ is passed to the python interpreter literally for attempted
 execution.  The interpreter will have access to the namespace of the executive process. 
 
 
 ### Communications
+The communications package contains modules that implement the supported communications processes and protocols. 
+
+* publish/subscribe - A lightweight facility for publishing and subscribing to messages, both within processes and 
+between them.  Typical objects communicated are python named tuples, but messages are not type limited.  Subscribers
+often inspect an incoming message's type to determine how to process it.
+* authorization - A module to manage authorization tokens and authenticate users against them.  For example, tokens 
+are used in communications with the web client to authenticate and authorize users. 
+* registration - A prototype module to register a robot with a centralized robotics service to facilitate further
+communications and updates.  Not fully implemented currently. 
+* http service - A lightweight, embedded http server that also notionally implements a REST api to provide command 
+processing and information flows between the robot and clients.  The service also supplies telemetry information on 
+request to any interested process.  Messages to and from the service are in __application/json__ format.
+This implementation is for development purposes and would be replaced by a production http server and applications 
+prior to production deployment.  Although https and authentication are supported, the service is not sufficiently secure
+for production.
+* http client - A lightweight client for communicating with the http service.  Clients such as Applications can embed
+this module to flexibly connect with the http service and thereby the rest of the system.
+* speech - A wrapper around __pyttsx3__ and an adaptor to connect speech as a service to the system. 
+* dock signal - An interface to __lirc__ to capture and process infrared signals from the charging dock as aids to 
+navigation during docking.
+* telemetry - Prototype module for generalizing telemetry processing.  Not currently in use.  A more advanced telemetry 
+processing capability is implemented in the state machine package.
+* zoom manager - zoom is currently used for the video conferencing function in telepresence and has been typically 
+managed manually.  This module will wrap the management of zoom communications and integrate and automate the management
+process with the robot system.  This module is under development and not currently released.
+
+
 ### Operations
 ### Drivers
 ### Applications
 
 ### Environment and setup
+
+## Hardware Overview
 
 
 ## Support and Collaboration

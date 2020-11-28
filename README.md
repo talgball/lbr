@@ -23,8 +23,9 @@ This project houses an experimental code base for exploring robotics software ar
 cases and typically delivered by one or more robotic hardware devices.  Telepresence, especially for residential use
 cases, has been an initial target in mind to help guide and focus the research.
 
-The project started in 2009 and has been progressing as a non-commercial, private research endeavor on a very part time 
-basis over the past 11 years.  During that period, the capabilities of cloud platforms, further development and adoption
+The project started in 2009 and has been progressing as a non-commercial, private research endeavor on a part time 
+basis a few hours at a time over the past 11 years.  During that period, the capabilities of cloud platforms, further 
+development and adoption
 robotic operating systems like ROS, the rise of digital assistants like Alexa and Siri, and other advances in the state 
 of the art have demonstrated that distributed and extensible sets of services can be integrated to produce a wide range 
 of useful capabilities.  Adding physical robots as part of delivering those capabilities is a logical next step.  The
@@ -42,9 +43,34 @@ notices.
 ## Software Overview
 The embedded portion of the lbr software architecture is organized into 4 packages and an extensible collection of 
 additional packages called, "applications".  There is also an external web client application and, at this writing, 
-a small amount of supporting clould servcies.  Only the embedded portion is being released at this time.
+a small amount of supporting cloud services.  Only the embedded portion is being released at this time.  
+
+Almost all of the code is written in python and currently requires python 3.5 or above.  The code style has evolved a
+bit over the years, and your kind patience is requested.  When the project was started, my most recent commercial 
+project that included personal coding was written in jython.  As we were using many Java libraries, we adopted 
+CamelCase.  Of course, the python community prefers snake_case, and I have come ultimately come back home to that, 
+although the previous packages have not been updated.  Also, users might notice that some packages and modules could 
+do with significant refactoring, which often happens with long lived code bases.  They are on "the list."  Finally, 
+some concepts have several different implementations across the code base.  That usually meant that each of them 
+were interesting topics to explore and compare with each other over the course of the project.  Obviously, those 
+would normally be optimized out in a commercial project.   
+
+Unit testing for each module is behind the
+ 
+    if __name__ == __main__:
+
+statement at the bottom of the module.  The main entrypoint module, robot.py, is an exception to this rule.  The others
+are not executed as mains at runtime.
+
 
 ### Executive
+The executive package provides for configuring the robot at run time and commands the rest of the system.  A 
+configuration module uses a sqllite database to store primary configuration information as metadata for significant 
+capabilities of the robot.  The configuration process reads the database and arranges for indicated processes to be 
+launched and connected together with various communications methods, typically python joinable queues.  Using this 
+approach, the robot itself is 
+
+
 ### Communications
 ### Operations
 ### Drivers

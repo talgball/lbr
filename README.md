@@ -78,19 +78,19 @@ often without changing the existing code.
 
 After launching with the robot command, the system provides a command console in a terminal window.  Three types of 
 commands are supported at the console: builtin, external and python.  Builtin commands are as follows:
-* /r/power/angle - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees 
+* __/r/power/angle__ - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees 
 from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180 is straight back.
-* /r/power/angle/range/sensor/interval - Run the motors at the given power level and angle subject to constraints:
-  * range - Distance measured by the indicated sensor must be greater than the value specified, between 0 and 769 cm.
-  * sensor - Indicate which of forward, back, left or right range sensors to measure against the constraint.
-  * interval - Stop the motors after the interval in seconds has expired, regardless of the range constraint.
-* S or s - Shortcut to immediately stop the motors.  Equivalent to /r/0/0.
-* /a/angle - Report when the robot has turned by the indicated number of degrees.
-* /t/angle - Turn the robot by the indicated number of degrees, 0 to +/- 360.  Positive angles turn clockwise.
-* /h/heading - Turn the robot to the indicated compass heading.
-* /s/text - Convert indicated text to speech and play it over default audio output. 
-* /d/song - Dance to the indicated song.  (Command no longer supported in current version.)
-* Shutdown - Shutdown the lbr software system
+* __/r/power/angle/range/sensor/interval__ - Run the motors at the given power level and angle subject to constraints:
+  * *range* - Distance measured by the indicated sensor must be greater than the value specified, between 0 and 769 cm.
+  * *sensor* - Indicate which of forward, back, left or right range sensors to measure against the constraint.
+  * *interval* - Stop the motors after the interval in seconds has expired, regardless of the range constraint.
+* __S or s__ - Shortcut to immediately stop the motors.  Equivalent to /r/0/0.
+* __/a/angle__ - Report when the robot has turned by the indicated number of degrees.
+* __/t/angle__ - Turn the robot by the indicated number of degrees, 0 to +/- 360.  Positive angles turn clockwise.
+* __/h/heading__ - Turn the robot to the indicated compass heading.
+* __/s/text__ - Convert indicated text to speech and play it over default audio output. 
+* __/d/song__ - Dance to the indicated song.  (Command no longer supported in current version.)
+* __Shutdown__ - Shutdown the lbr software system
 
 Note that when operating the robot from a client, such as the web application, these commands derived from indications 
 expressed in the user interface and supplied automatically to the executive module for processing.  The command console
@@ -99,9 +99,9 @@ provides a manual means of controlling the robot without a client and is also us
 External commands are added to the executive based on configurations in the metadata.  Typically, a command string 
 and optional arguments are mapped to an entry point which is launched in a separate process on invocation.  Currently,
 The following external commands are supported:
-*  navcam - Launch the navigation camera application, which is further described below in the __Applications__ section.
-*  docksignal - Launch the listener for infrared signals from the robot's charging dock to aid in docking navigation.
-*  autodock - Launch the automatic docking application to guide the robot into it's charging dock.
+*  __navcam__ - Launch the navigation camera application, which is further described below in the __Applications__ section.
+*  __docksignal__ - Launch the listener for infrared signals from the robot's charging dock to aid in docking navigation.
+*  __autodock__ - Launch the automatic docking application to guide the robot into it's charging dock.
 
 Hooks for command acceptance and further processing are stubbed out in the executive.  The idea behind this construct
 is to provide a place in the architecture to connect to higher level rules or evaluation systems to determine whether 
@@ -114,27 +114,27 @@ execution.  The interpreter will have access to the namespace of the executive p
 ### Communications
 The communications package contains modules that implement the supported communications processes and protocols. 
 
-* publish/subscribe - A lightweight facility for publishing and subscribing to messages, both within processes and 
+* __publish/subscribe__ - A lightweight facility for publishing and subscribing to messages, both within processes and 
 between them.  Typical objects communicated are python named tuples, but messages are not type limited.  Subscribers
 often inspect an incoming message's type to determine how to process it.
 * authorization - A module to manage authorization tokens and authenticate users against them.  For example, tokens 
 are used in communications with the web client to authenticate and authorize users. 
-* registration - A prototype module to register a robot with a centralized robotics service to facilitate further
+* __registration__ - A prototype module to register a robot with a centralized robotics service to facilitate further
 communications and updates.  Not fully implemented currently. 
-* http service - A lightweight, embedded http server that also notionally implements a REST api to provide command 
+* __http service__ - A lightweight, embedded http server that also notionally implements a REST api to provide command 
 processing and information flows between the robot and clients.  The service also supplies telemetry information on 
 request to any interested process.  Messages to and from the service are in __application/json__ format.
 This implementation is for development purposes and would be replaced by a production http server and applications 
 prior to production deployment.  Although https and authentication are supported, the service is not sufficiently secure
 for production.
-* http client - A lightweight client for communicating with the http service.  Clients such as Applications can embed
+* __http client__ - A lightweight client for communicating with the http service.  Clients such as Applications can embed
 this module to flexibly connect with the http service and thereby the rest of the system.
-* speech - A wrapper around __pyttsx3__ and an adaptor to connect speech as a service to the system. 
-* dock signal - An interface to __lirc__ to capture and process infrared signals from the charging dock as aids to 
+* __speech__ - A wrapper around __pyttsx3__ and an adaptor to connect speech as a service to the system. 
+* __dock signal__ - An interface to __lirc__ to capture and process infrared signals from the charging dock as aids to 
 navigation during docking.
-* telemetry - Prototype module for generalizing telemetry processing.  Not currently in use.  A more advanced telemetry 
+* __telemetry__ - Prototype module for generalizing telemetry processing.  Not currently in use.  A more advanced telemetry 
 processing capability is implemented in the state machine package.
-* zoom manager - zoom is currently used for the video conferencing function in telepresence and has been typically 
+* __zoom manager__ - zoom is currently used for the video conferencing function in telepresence and has been typically 
 managed manually.  This module will wrap the management of zoom communications and integrate and automate the management
 process with the robot system.  This module is under development and not currently released.
 

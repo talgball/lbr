@@ -23,14 +23,14 @@ This project houses an experimental code base for exploring robotics software ar
 cases and typically delivered by one or more robotic hardware devices.  Telepresence, especially for residential use
 cases, has been an initial target in mind to help guide and focus the research.
 
-The project started in 2009 and has been progressing as a non-commercial, private research endeavor on a part time 
-basis a few hours at a time over the past 11 years.  During that period, the capabilities of cloud platforms, further 
-development and adoption
+The project started in 2009 and has been progressing as a private research endeavor on a part time 
+basis by one developer working a few hours at a time over the past 11 years and counting.  During that period, 
+the capabilities of cloud platforms, further development and adoption
 robotic operating systems like ROS, the rise of digital assistants like Alexa and Siri, and other advances in the state 
 of the art have demonstrated that distributed and extensible sets of services can be integrated to produce a wide range 
 of useful capabilities.  Adding physical robots as part of delivering those capabilities is a logical next step.  The
 primary project goals of learning and developing concepts have been progressing alongside developments in the broader 
-industry, and it's fun to participate and to play along.
+industry, and it's fun to participate in this journey.
 
 To support development and testing of the software and architecture, a single robotics development hardware platform was
 constructed.  While the code base here is configured for the specifics of that particular robot, the architecture and 
@@ -92,7 +92,7 @@ from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180
 * __/t/angle__ - Turn the robot by the indicated number of degrees, 0 to +/- 360.  Positive angles turn clockwise.
 * __/h/heading__ - Turn the robot to the indicated compass heading.
 * __/s/text__ - Convert indicated text to speech and play it over default audio output. 
-* __/d/song__ - Dance to the indicated song.  (Command no longer supported in current version.)
+* __/d/song__ - Play the indicated song and dance to it.  (Command no longer supported in current version.)
 * __Shutdown__ - Shutdown the lbr software system
 
 Note that when operating the robot from a client, such as the web application, these commands derived from indications 
@@ -196,17 +196,18 @@ made in the software to support a 5th sensor to check for bottom distance, in ca
 a staircase, but that sensor is not installed in the current robot.  
 * __9 axis mpu__ A driver to communicate over the i2c bus with an InvenSense MPU9150 9 axis motion processing unit. The
 unit contains a 3 axis gyroscope, accelerometer and magnetometer.  Readings are gathered at the request of motion 
-processing operations at the request of the operations manager.  The mpu9150 is a complex device, and careful study of 
+processing operations in collaboration with the operations manager.  The MPU9150 is a complex device, and careful study of 
 its datasheet and other documents is required to operate it.  This driver configures and 
 operates the device according to the manufacturer's specifications and provides the data in a single, timestamped json 
 structure.  In addition to the 9 raw data streams plus the temperature reading, the driver calculates the compass heading 
 in degrees from the magnetometer readings.  Note that the driver does not tilt compensate the magnetometer readings 
-because this robot typically operates in a level, 2 dimensional plane.  The tilt compensation calculation is on the todo 
+because this initial robot typically operates in a level, 2 dimensional plane.  The tilt compensation calculation is on the todo 
 list.  In order to retrieve accurate magnetometer readings, hard and soft iron compensation might be needed.  A test 
-procedure is referenced in the code. The current particular robot required only hard iron adjustments, which were 
+procedure is referenced in the code. The current robot required only hard iron adjustments, which were 
 calculated last in 2019.  Note that InvenSense does provide sdk's for driver development
-for more typical projects, but a python version was needed in this case.  The device contains additional proprietary 
-features for further onboard processing of the data streams to offload system cpu resources, and those were not acquired.
+for more typical projects, but a lightweight python version was desired in this case.  The device contains additional proprietary 
+features for further onboard processing of the data streams to offload system cpu resources.  Utilizing those capabilites 
+requires a commercial releationship with InvenSense, and those were not implemented.
 * __battery__ - A simple driver to map voltage readings from a 12 Volt, 35 Amp-Hour Absorbed Glass Mat (AGM) battery 
 into a state of charge table and report the ongoing status to interested processes, via the ops manager in this case.
 * __av__ - A wrapper package to access audio visual capabilities of a Raspberry Pi 3 GPU.  This module is incomplete and
@@ -258,7 +259,27 @@ project was founded upon.
 
 
 
-### Environment and setup
+### Environment and Setup
+The system is configured using a combination of environment variables passed from the operation system and information
+in the settings.py module.  Environment variables are used to pass private information such as credentials into the 
+system without storing the information in any of the code modules.
+
+Supported environment variables are as follows:
+* ROBOT_URL - URL of the robot's http service
+* ROBOT_CRED - Path to a directory containing credentials files
+* ROBOT_CERT - Path to the robot's https certificate
+* ROBOT_KEY  - Path to the robot's private key for the https certificate
+* ROBOT_CA - Path to the robot's signing authority certificate 
+* ROBOT_USER - String containing the username assocatied with the APITOKEN to be authenticated
+* ROBOT_APITOKEN - String containing the token for authenticating the current robot user to enable API access
+* ROBOT_AWS_CERT - Path to the certificate for accessing AWS IoT as a Thing
+* ROBOT_AWS_KEY - Path to the private key for use in communicating with AWS IoT
+* ROBOT_AWS_ENDPOINT - String containing the URL of the AWS IoT Thing 
+* ROBOT_AWS_ROOT_CA - Path to the AWS root certificate
+* ROBOT_DJ_USER - String containing the robot user name for registering with the bfrobotics web services
+* ROBOT_DJ_APITOKEN - String containing API access token issued by the bfrobotics web services
+* ROBOT_DOCK - String indicating which lirc contains the infrared docking messages
+
 
 ## Hardware Overview
 

@@ -261,7 +261,7 @@ project was founded upon.
 
 ### Environment and Setup
 The system is configured using a combination of environment variables passed from the operation system and information
-in the settings.py module.  Environment variables are used to pass private information such as credentials into the 
+in the *settings.py* module.  Environment variables are used to pass private information such as credentials into the 
 system without storing the information in any of the code modules.
 
 Supported environment variables are as follows:
@@ -280,8 +280,35 @@ Supported environment variables are as follows:
 * ROBOT_DJ_APITOKEN - String containing API access token issued by the bfrobotics web services
 * ROBOT_DOCK - String indicating which lirc contains the infrared docking messages
 
+A planned but not yet released feature for *settings.py* is to enable "fake devices" so that the system could be 
+exercised without requiring the robot hardware to be present.  This document will be updated when the feature is 
+available.
+
 
 ## Hardware Overview
+The lbr development platform hardware was designed for flexibility and to support an ongoing set of experiments, including
+hardware upgrades over the life of the robot.  It was not designed for productization directly.  However, the telepresense
+use case requires the robot to have a sufficient physical height to make video conferencing with remote users comfortable.
+The approximate overall dimensions of the robot are 56" X 17", and the system weighs approximately 35 pounds.
+
+* __Chassis__ - The frame is constructed from T6 aircraft aluminum, 1/8" thick and using a combination of 1" angle iron
+pieces and 1/8" aluminum sheets.  Internally, movable 1/4" acrylic shelves hold the electronics.  A removable riser is
+attached to the chassis to hold the monitor and video conferencing camera.  
+* __Motors and Drive Train__ - Two school bus windshield wiper gear motors from American Electric Motors are utilized.
+These motors have electromechanical specifications similar to electric wheelchair motors but are significantly 
+less expensive.  They have continued to perform well over the life of the platform.  The motors are mounted to the 
+chassis with custom aluminum mounts.  6" solid rubber garden cart wheels are attached to the motors.  Their nylon hubs
+are augmented and reinforced with steel hub assemblies backed with aluminum plates.  The wheel bearing surfaces 
+are interfaced to the drive shafts using stainless steel piping to form a precise and durable fit.  In early drive train
+testing, the chassis comfortably transported a 90 pound kit around the pool deck.  (Don't try this at home.)
+* __Electrical__ -  Automotive components are used in the electrical power section due to their easy availability and 
+overall reliability and since the system employs a 12V architecture.  The battery is a 12V, 35 Amp-Hour AGM.  Circuits 
+are branched and fused using an automotive fuse block.  The system also has a 100AMP safety switch that disconnects the 
+battery from the system.  Note that a bypass wire protected by a power diode should be added around the fuses and 
+disconnect switch such that the motors always have a guaranteed return path to the battery.  Otherwise, transients 
+could damage the motor controller during a failure event.  The battery is charged by an external charging system 
+mounted in the docking station.
+
 
 
 ## Support and Collaboration

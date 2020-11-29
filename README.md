@@ -294,6 +294,7 @@ The approximate overall dimensions of the robot are 56" X 17", and the system we
 * __Chassis__ - The frame is constructed from T6 aircraft aluminum, 1/8" thick and using a combination of 1" angle iron
 pieces and 1/8" aluminum sheets.  Internally, movable 1/4" acrylic shelves hold the electronics.  A removable riser is
 attached to the chassis to hold the monitor and video conferencing camera.  
+
 * __Motors and Drive Train__ - Two school bus windshield wiper gear motors from American Electric Motors are utilized.
 These motors have electromechanical specifications similar to electric wheelchair motors but are significantly 
 less expensive.  They have continued to perform well over the life of the platform.  The motors are mounted to the 
@@ -301,19 +302,52 @@ chassis with custom aluminum mounts.  6" solid rubber garden cart wheels are att
 are augmented and reinforced with steel hub assemblies backed with aluminum plates.  The wheel bearing surfaces 
 are interfaced to the drive shafts using stainless steel piping to form a precise and durable fit.  In early drive train
 testing, the chassis comfortably transported a 90 pound kit around the pool deck.  (Don't try this at home.)
-* __Electrical__ -  Automotive components are used in the electrical power section due to their easy availability and 
-overall reliability and since the system employs a 12V architecture.  The battery is a 12V, 35 Amp-Hour AGM.  Circuits 
-are branched and fused using an automotive fuse block.  The system also has a 100AMP safety switch that disconnects the 
-battery from the system.  Note that a bypass wire protected by a power diode should be added around the fuses and 
-disconnect switch such that the motors always have a guaranteed return path to the battery.  Otherwise, transients 
-could damage the motor controller during a failure event.  The battery is charged by an external charging system 
-mounted in the docking station.
 
+    My most significant regret in the original design is not including rotary encoders.  That additional data would 
+    have made a lot of tasks with the software much more approachable, including autonomous mapping. 
+  
+* __Electrical__ -  Automotive components are used in the electrical power section due to their easy availability and 
+overall reliability and since the system employs a 12V architecture.  The battery is a U1, 12V, 35 Amp-Hour AGM, which 
+provides a duty cycle of 6-8 hours in the current configuration.  Circuits are branched and fused using an automotive 
+fuse block.  A 100AMP safety switch that disconnects the battery from the system.  Note that a bypass wire protected 
+by a power diode should be added around the fuses and disconnect switch such that the motors always have a guaranteed 
+return path to the battery.  Otherwise, transients could damage the motor controller during a failure event.  
+The battery is charged by an external charging system mounted in the docking station.
+
+* __Computer__ - The original implementation was a windows based machine on a Mini ATX motherboard.  That 
+configuration in 2010 was a bit power hungry, but it worked well, and Skype was used for video conferencing (especially
+pre-acquisition).  Through a series of further experiments, the current main computer is a Raspberry Pi 3 4GB, which
+comfortably runs the lbr system exept for the video conferencing.  Currently, zoom conferencing runs on an additional
+windows stick.  It is likely that a future revision will settle on an Intel based Linux system that supports zoom, unless
+a custom video system is implemented.  The debate is underway.
+
+* __Electronics__ - Most of the remaining electronic devices were described in the __Drivers__ section.  The infrared 
+receiver and transmitter are custom circuits that interface to the Raspberry PI's GPIOs and are driven by the kernel
+module supplied with Raspberry PI OS.  In addition, two custom switched 12V outlets are controlled by GPIOs. One is
+used for powering the monitor, and the other one is used for the windows stick.  The Parallax P8X32 MCU has 
+6 additional cores available, as 2 of the 8 are currently in use in driving the ultrasonic array.  The MCU has at least
+20 unused GPIOs for future use, in addition to the unused Raspberry PI GPIOs, noting that the i2c bus is driven from the
+Raspberry Pi instead of the MCU.  The MCU is interfaced to the Raspberry PI over USB.
+
+* __Monitor__ - The montor is an Eyoyo 12 Inch HD unit with builtin speakers, typically used in surveillance systems.  
+The key characteristics of the monitor are that it operates on 12V and is HD, 1920x1080, and that it automatically turns on
+when its power is toggled.
+
+* __Cameras__ - The navigation camera is a Raspberry Pi V2 camera module with an 8MP Sony image sensor.  
+The video conferencing camera is Logitec C920 USB webcam.  Various camera configurations have been explored over time, 
+and it seems that the needs for navigation and video conferencing are sufficiently different that it is easier to have 
+two cameras in the design.  
+
+Having read this far, you might be curious about why the project is called, "little brother robot."  When the project 
+started, my then 11 year old son came into the work shop and asked if I was building him a little brother.  I thought that
+was a cool way to think about it, and the name stuck.   
 
 
 ## Support and Collaboration
+As this or other robotics projects continue to unfold, opportunities to collaborate are welcome.  While this software is 
+provided on an as-is basis, I'd be happy to answer questions or help resolve issues, subject to my availability.
 
-## Next Steps
+My email address is __tal@ballfamily.org__
 
 
 

@@ -342,7 +342,7 @@ used for powering the monitor, and the other one is used for the windows stick. 
 20 unused GPIOs for future use, in addition to the unused Raspberry PI GPIOs, noting that the i2c bus is driven from the
 Raspberry Pi instead of the MCU.  The MCU is interfaced to the Raspberry PI over USB.
 
-*__Docking Station__ - The docking station transmits infrared signals that are used by the robot during docking, and it 
+* __Docking Station__ - The docking station transmits infrared signals that are used by the robot during docking, and it 
 also recieves signals.  The transceiver circuits are custom, and they are driven by a Parallax P8X32 MCU.  The communications
 protocol is an implementation of the Sony IR remote standard.  The C source 
 for the docking firmware is not included in this repository but is available on request. The docking

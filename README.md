@@ -230,7 +230,7 @@ table specifies the conditions required to go on to any number of next states.  
 communicates via the REST api interface with the robot.  While the current configuration runs the state machine as an
 embedded component, it could operate from any connected location.
 
-The format of the conditions supports
+    The format of the conditions supports
 user specified tolerances for each condition.  For example, if a desired range is 40cm, a user might specify that ranges
 from 39 to 41cm are acceptable.  Tolerance management capabilities are key elements for operating complex systems. 
 Further, the state machine does not require specific knowledge of a particular telemetry package.  It searches the package 
@@ -238,7 +238,7 @@ presented for the information required to match its target conditions regardless
 robot implements additional sensors and data streams, the state machine can immediately utilize them based on new
 state tables.  
 
-The initial example usage of the application is the automatic docking procedure.  When the robot is
+    The initial example usage of the application is the automatic docking procedure.  When the robot is
 in the room with the docking station, the autodock state table is executed to autonomously pilot the robot to the dock
 and verify that it is successfully being charged.  With this abstracted, csv driven approach, the state machine could 
 serve as a type of "muscle memory" for behaviours that are complex but not necessarily intelligent on their own.  In 
@@ -250,7 +250,7 @@ AWS IoT Core Thing Device Shadow.  Telemetry data is reported to the shadow, and
 the shadow.  Commanding the motors from the desired state information has not yet been tested, and note that the 
 currrent configuration is reporting shadow updates every 5 seconds.  Operating the motors would require shorter cycles.
 
-This application was developed in mid 2020 and is an exciting new avenue for the project.  The project predated 
+    This application was developed in mid 2020 and is an exciting new avenue for the project.  The project predated 
 Amazon's IoT services, and integrating with them would simplify any eventual production deployment and generally 
 accelerate access to cloud based capabilities.  For example, creating Alexa skills to operate the robot would be a 
 small incremental step from here.  In many ways, IoT exemplifies the distributed  architectural concepts that the 

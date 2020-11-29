@@ -221,28 +221,40 @@ Applications are packages that utilize and/or extend the lbr system.
 
 * __navcam__ - A lightweight module to stream mjpeg video from the Raspberry Pi Camera module to navigation clients over 
 http based on the work by Dave Jones.
+
 * __state machine__ - A general purpose, finite state machine application to operate lbr.  Complex behaviors that can 
 be modeled as finite state machines can be implemented using this application by providing a state transition table as 
-a csv file with the prescribed set of columns.  The state machine follows the table sequentially outputting the 
+a csv or json file with the prescribed set of columns.  The state machine follows the table sequentially outputting the 
 specified commands to lbr and collecting the telemetry package back as inputs to evaluate for the next step. The state
-table specifies the conditions required to go on to any number of next states.  The format of the conditions supports
+table specifies the conditions required to go on to any number of next states.  The state machine application 
+communicates via the REST api interface with the robot.  While the current configuration runs the state machine as an
+embedded component, it could operate from any connected location.
+
+The format of the conditions supports
 user specified tolerances for each condition.  For example, if a desired range is 40cm, a user might specify that ranges
 from 39 to 41cm are acceptable.  Tolerance management capabilities are key elements for operating complex systems. 
 Further, the state machine does not require specific knowledge of a particular telemetry package.  It searches the package 
 presented for the information required to match its target conditions regardless of the hierarchical structure.  As a 
 robot implements additional sensors and data streams, the state machine can immediately utilize them based on new
-state tables.  The initial example usage of the application is the automatic docking procedure.  When the robot is
+state tables.  
+
+The initial example usage of the application is the automatic docking procedure.  When the robot is
 in the room with the docking station, the autodock state table is executed to autonomously pilot the robot to the dock
 and verify that it is successfully being charged.  With this abstracted, csv driven approach, the state machine could 
 serve as a type of "muscle memory" for behaviours that are complex but not necessarily intelligent on their own.  In 
 the future, coupling this capability with an AI that could design new behaviors and present them to the 
 state machine would mean that the robot could immediately "learn" new the behaviors dynamically without code changes.
+
 * __IoT__ - An adaptation and implementation of an Amazon AWS sample program to facilitate communications with an 
 AWS IoT Core Thing Device Shadow.  Telemetry data is reported to the shadow, and desired states are retrieved from 
-the shadow.  Commanding the motors from the desired state information has not yet been tested.  This application was
-developed in mid 2020 and is an exciting new avenue for the project.  The project predated Amazon's IoT services, and
-integrating with them would simplify any eventual production deployment and generally accelerate access to cloud based
-capabilities.  In many ways, IoT exemplifies the distributed  architecture concepts that the project was founded upon.
+the shadow.  Commanding the motors from the desired state information has not yet been tested, and note that the 
+currrent configuration is reporting shadow updates every 5 seconds.  Operating the motors would require shorter cycles.
+
+This application was developed in mid 2020 and is an exciting new avenue for the project.  The project predated 
+Amazon's IoT services, and integrating with them would simplify any eventual production deployment and generally 
+accelerate access to cloud based capabilities.  For example, creating Alexa skills to operate the robot would be a 
+small incremental step from here.  In many ways, IoT exemplifies the distributed  architectural concepts that the 
+project was founded upon.
 
 
 

@@ -41,6 +41,10 @@ can clone or download this repository or any of its components, subject to the i
 notices.
 
 ## Demonstration Videos
+Here are couple of brief demos:
+
+* [__Navigation__](https://youtu.be/vbRg4YTh7xg)
+* [__Automatic Docking__](https://youtu.be/1rOheZw6kcA) 
 
 
 ## Software Overview
@@ -321,15 +325,7 @@ comfortably runs the lbr system exept for the video conferencing.  Currently, zo
 windows stick.  It is likely that a future revision will settle on an Intel based Linux system that supports zoom, unless
 a custom video system is implemented.  The debate is underway.
 
-* __Electronics__ - Most of the remaining electronic devices were described in the __Drivers__ section.  The infrared 
-receiver and transmitter are custom circuits that interface to the Raspberry PI's GPIOs and are driven by the kernel
-module supplied with Raspberry PI OS.  In addition, two custom switched 12V outlets are controlled by GPIOs. One is
-used for powering the monitor, and the other one is used for the windows stick.  The Parallax P8X32 MCU has 
-6 additional cores available, as 2 of the 8 are currently in use in driving the ultrasonic array.  The MCU has at least
-20 unused GPIOs for future use, in addition to the unused Raspberry PI GPIOs, noting that the i2c bus is driven from the
-Raspberry Pi instead of the MCU.  The MCU is interfaced to the Raspberry PI over USB.
-
-* __Monitor__ - The montor is an Eyoyo 12 Inch HD unit with builtin speakers, typically used in surveillance systems.  
+* __Monitor__ - The monitor is an Eyoyo 12 Inch HD unit with builtin speakers, typically used in surveillance systems.  
 The key characteristics of the monitor are that it operates on 12V and is HD, 1920x1080, and that it automatically turns on
 when its power is toggled.
 
@@ -337,6 +333,20 @@ when its power is toggled.
 The video conferencing camera is Logitec C920 USB webcam.  Various camera configurations have been explored over time, 
 and it seems that the needs for navigation and video conferencing are sufficiently different that it is easier to have 
 two cameras in the design.  
+
+* __Other Electronics__ - Most of the remaining electronic devices were described in the __Drivers__ section.  The infrared 
+receiver and transmitter are custom circuits that interface to the Raspberry PI's GPIOs and are driven by the kernel
+module supplied with Raspberry PI OS.  In addition, two custom switched 12V outlets are controlled by GPIOs. One is
+used for powering the monitor, and the other one is used for the windows stick.  The Parallax P8X32 MCU has 
+6 additional cores available, as 2 of the 8 are currently in use in driving the ultrasonic array.  The MCU has at least
+20 unused GPIOs for future use, in addition to the unused Raspberry PI GPIOs, noting that the i2c bus is driven from the
+Raspberry Pi instead of the MCU.  The MCU is interfaced to the Raspberry PI over USB.
+
+*__Docking Station__ - The docking station transmits infrared signals that are used by the robot during docking, and it 
+also recieves signals.  The transceiver circuits are custom, and they are driven by a Parallax P8X32 MCU.  The communications
+protocol is an implementation of the Sony IR remote standard.  The C source 
+for the docking firmware is not included in this repository but is available on request. The docking
+station also embeds a NOCO Genius AGM charging system.
 
 Having read this far, you might be curious about why the project is called, "little brother robot."  When the project 
 started, my then 11 year old son came into the work shop and asked if I was building him a little brother.  I thought that

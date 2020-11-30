@@ -17,8 +17,8 @@ increasingly available for in home use.  Some of the initial in home use cases m
 office use cases.  For example, being more deeply and continuously connected with family and community 
 might help people maintain their independence during periods of their lives that would have traditionally required 
 specialized facilities.  Imagine a robot that not only enables telepresence but is also equipped with sophisticated 
-sensors and other devices to help people monitor their health issues and connect proactively to support services.  
-Since a telepresence robot could have many remote users, doctors could make virtual house calls and provide a level of 
+sensors and other devices to help people monitor their health issues and connect proactively to support services. Since 
+a telepresence robot could have many remote users, doctors could make virtual house calls and provide a level of 
 service well beyond the telehealth capabilities that have advanced over the past year.  Then the same device could be 
 used by friends and family to stay connected after the doctor's visit.
  

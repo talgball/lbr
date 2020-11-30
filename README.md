@@ -325,8 +325,8 @@ American Electric Motors are utilized.  These motors have electromechanical spec
 motors but are significantly less expensive.  They have continued to perform well over the life of the platform.  The 
 motors are mounted to the chassis with custom aluminum mounts.  6" solid rubber garden cart wheels are attached to the 
 motors.  Their nylon hubs are augmented and reinforced with steel hub assemblies backed with aluminum plates.  The wheel 
-bearing surfaces are interfaced to the drive shafts using stainless steel piping to form a precise and durable fit.  
-In early drive train testing, the chassis comfortably transported a 90 pound kid around the pool deck.  (Don't try this at home.)
+bearing surfaces are interfaced to the drive shafts using stainless steel piping to form a precise and durable fit. In 
+early drive train testing, the chassis comfortably transported a 90 pound kid around the pool deck.  (Don't try this at home.)
 
     My most significant regret in the original design is not including rotary encoders.  That additional data would 
     have made a lot of tasks with the software much more approachable, including autonomous mapping. 

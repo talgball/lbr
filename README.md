@@ -5,7 +5,7 @@ Distributed Robot Operating System Architecture and Design Experiments
 
 ## Introduction
 Telepresence robotics is a young and promising space that has potential for bringing people together in more engaging and
-flexible ways than current video conferencing approaches.  If instead of just appearing passively on a screen,  
+flexible ways than current video conferencing approaches.  If instead of just appearing passively on a screen, 
 remote people could engage more actively in the space with local participants, the quality of communicating and 
 connecting with each other would be radically enhanced and begin to feel more natural and rewarding.  
 

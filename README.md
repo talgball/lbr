@@ -37,10 +37,10 @@ delivering those capabilities is a logical next step, and it's rewarding to work
 accelerating developments.
 
 While 2020 has been a year of challenge and isolation, people have found expanded ways to connect with each other, 
-ranging from long hours of video conferencing to signing from their balconies around the world.  The growing need for
+ranging from long hours of video conferencing to singing from their balconies around the world.  The growing need for
 connecting, working, collaborating, understanding and just being with each other will continue long after this pandemic
 has ended.  The decision to open source the project now is in the hope that it might be of some use or inspiration to others 
-who seek to bring people closer together in the years ahead using the amazing technologies of our time and perhaps to 
+who seek to bring people closer together using the amazing technologies of our time and perhaps to 
 encourage groups of us to work together in that endeavor.
 
 This repository houses a relatively small experimental code base for exploring robotics software architectures.  

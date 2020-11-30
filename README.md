@@ -336,8 +336,8 @@ overall reliability and since the system employs a 12V electrical system.  The b
 provides a duty cycle of about 8 hours in the current configuration.  Circuits are branched and fused using an automotive 
 fuse block.  A 100AMP safety switch disconnects the battery from the system.  Note that a bypass wire protected 
 by a power diode should be added around the fuses and disconnect switch such that the motors always have a guaranteed 
-return path to the battery.  Otherwise, transients could damage the motor controller during a failure event.  
-The battery is charged by an external charging system mounted in the docking station.
+return path to the battery.  Otherwise, transients could damage the motor controller during a failure event.  The 
+battery is charged by an external charging system mounted in the docking station.
 
 * __Computer__ - The original implementation was a windows based machine on a Mini ATX motherboard.  That 
 configuration in 2009 was a bit power hungry, but it worked well, and Skype was used for video conferencing (especially

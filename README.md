@@ -4,44 +4,61 @@ Distributed Robot Operating System Architecture and Design Experiments
 ![System and Architecture](https://github.com/talgball/lbr/blob/master/docs/images/2020lbrsystem.png)
 
 ## Introduction
-Telepresence is a young and promising space that has the potential for bringing people together in engaging and more 
-flexible ways.  2020 has been a year of isolation for many people, and the long hours of video conferencing 
-have made it possible to maintain more of life and work than would have been possible otherwise.  If instead of just
-appearing passively on a screen, the remote people could engage more actively in the meeting space and with the other 
-participants, the quality of communicating and connecting with each other would be radically enhanced and begin to 
-feel more natural and rewarding.  In addition, being more deeply and continuously connected with family and community 
-might also help people maintain their independence during periods of their lives that would have traditionally required 
-specialized facilities.  Imagine a robot that is not only a telepresence device but is also equipped with sophisticated 
-sensors and other devices to help people monitor their health issues and enable proactive support services.  Since a 
-telepresence robot could have many remote users, doctors could make virutal house calls and provide a level of service 
-beyond even the telehealth capabilities that have advanced over the past year.  The decision to open source the project
-now is in the hope that it might be of some use or inspiration to others who seek to bring people closer together in the
-years ahead.
+Telepresence robotics is a young and promising space that has potential for bringing people together in more engaging and
+flexible ways than current video conferencing approaches.  If instead of just appearing passively on a screen,  
+remote people could engage more actively in the space with local participants, the quality of communicating and 
+connecting with each other would be radically enhanced and begin to feel more natural and rewarding.  
 
-This project houses an experimental code base for exploring robotics software architectures.  The concept of 
-"robot" in the architecture is a distributed set of services and capabilities focused on satisfying one or more use
-cases and typically delivered by one or more robotic hardware devices.  Telepresence, especially for residential use
-cases, has been an initial target in mind to help guide and focus the research.
+According to Verified Market Research, the global telepresence robot market was $181.6M USD in 2019 and is projected to 
+reach $789.1M by 2027, representing a 20.2% compound annual growth rate.  The telepresence products currently in the 
+market are primarily aimed at work environments, with healthcare being a 
+leading market driver.  As the technology continues to develop, better and more cost effective robots will become
+increasingly available for in home use.  Some of the initial in home use cases might well be extensions of the current 
+office use cases.  For example, being more deeply and continuously connected with family and community 
+might help people maintain their independence during periods of their lives that would have traditionally required 
+specialized facilities.  Imagine a robot that not only enables telepresence but is also equipped with sophisticated 
+sensors and other devices to help people monitor their health issues and connect proactively to support services.  
+Since a telepresence robot could have many remote users, doctors could make virtual house calls and provide a level of 
+service well beyond the telehealth capabilities that have advanced over the past year.  Then the same device could be 
+used by friends and family to stay connected after the doctor's visit.
+ 
+This project started in 2009 and has been progressing as a private research endeavor on a part time 
+basis by one developer working a few hours at a time over the past 11 years and counting.  The goals of the project are
+as follows:
+* Learning and developing concepts in robotics and telepresence.
+* Exploring the possibilities of integrating existing technologies and services to produce and enhance robotic use cases.
+* Discovering and developing opportunities for in home telepresence robots.  
 
-The project started in 2009 and has been progressing as a private research endeavor on a part time 
-basis by one developer working a few hours at a time over the past 11 years and counting.  During that period, 
-the capabilities of cloud platforms, further development and adoption
-robotic operating systems like ROS, the rise of digital assistants like Alexa and Siri, and other advances in the state 
-of the art have demonstrated that distributed and extensible sets of services can be integrated to produce a wide range 
-of useful capabilities.  Adding physical robots as part of delivering those capabilities is a logical next step.  The
-primary project goals of learning and developing concepts have been progressing alongside developments in the broader 
-industry, and it's fun to participate in this journey.
+During the life of the project, the capabilities of cloud platforms, advances in robotics like the further development 
+and adoption robotic operating systems like ROS, the rise of digital assistants like Alexa and Siri, and other advances 
+have demonstrated that distributed and extensible sets of services can be integrated to produce useful capabilities
+that might not have been envisioned when any one of the technologies was created.  Adding physical robots as part of 
+delivering those capabilities is a logical next step, and it's rewarding to work along side these broad and rapidly
+accelerating developments.
+
+While 2020 has been a year of challenge and isolation, people have found expanded ways to connect with each other, 
+ranging from long hours of video conferencing to signing from their balconies around the world.  The growing need for
+connecting, working, collaborating, understanding and just being with each other will continue long after this pandemic
+has ended.  The decision to open source the project now is in the hope that it might be of some use or inspiration to others 
+who seek to bring people closer together in the years ahead using the amazing technologies of our time and perhaps to 
+encourage groups of us to work together in that endeavor.
+
+This repository houses a relatively small experimental code base for exploring robotics software architectures.  
+The concept of "robot" in the architecture is a distributed set of services and capabilities focused on satisfying one 
+or more use cases and typically delivered by one or more robotic hardware devices.  Telepresence, especially for 
+residential use cases, has been an initial target in mind to help guide and focus the research.  Many of the concepts 
+explored in the code are not new, and the combinations of them has been the primary area of focus.
 
 To support development and testing of the software and architecture, a single robotics development hardware platform was
 constructed.  While the code base here is configured for the specifics of that particular robot, the architecture and 
 capabilities of the software would support a wide range of alternative hardware.  The software could be used as a whole
 system, or its packages and modules could be used individually as needed to help with other projects.  As the code is
-currently in an experimental state, it has not yet been packaged into a standard distribution package.  Instead, users
+currently in an experimental state, it has not yet been packaged into a standard distribution.  Instead, users
 can clone or download this repository or any of its components, subject to the included Apache 2 license agreement and
 notices.
 
 ## Demonstration Videos
-Here are couple of brief demos:
+Here are couple of brief and definitely unpolished demos:
 
 * [__Navigation__](https://youtu.be/vbRg4YTh7xg)
 * [__Automatic Docking__](https://youtu.be/1rOheZw6kcA) 
@@ -50,25 +67,7 @@ Here are couple of brief demos:
 ## Software Overview
 The embedded portion of the lbr software architecture is organized into 4 packages and an extensible collection of 
 additional packages called, "applications".  There is also an external web client application and, at this writing, 
-a small amount of supporting cloud services.  Only the embedded portion is being released at this time.  
-
-Almost all of the code is written in python and currently requires python 3.5 or above.  The code style has evolved a
-bit over the years, and your kind patience is requested.  When the project was started, my most recent commercial 
-project that included personal coding was written in jython.  As we were using many Java libraries, we adopted 
-CamelCase.  Of course, the python community prefers snake_case, and I have come ultimately come back home to that, 
-although the previous packages have not been updated.  Also, users might notice that some packages and modules could 
-do with significant refactoring, which often happens with long lived code bases.  They are on "the list."  Finally, 
-some concepts have several different implementations across the code base.  That usually meant that each of them 
-were interesting topics to explore and compare with each other over the course of the project.  Obviously, those 
-would normally be optimized out in a commercial project.   
-
-Unit testing for each module is behind the
- 
-    if __name__ == __main__:
-
-statement near the bottom of the module.  The main entry point module, robot.py, is an exception to this rule.  
-The others are not executed as mains at runtime except during unit testing.
-
+a small amount of supporting cloud based services.  Only the embedded portion is being released at this time.  
 
 ### Executive
 The executive package provides for configuring the robot at run time and commands the rest of the system.  It also 
@@ -78,11 +77,11 @@ A configuration module uses a sqllite database to store primary configuration in
 capabilities of the robot.  The configuration process reads the database and arranges for indicated processes to be 
 launched and connected together with various communications methods, typically python joinable queues, as specified in
 the metadata.  The usual pattern is to create two joinable queues between connected processes.  One of them is used 
-to send command messages, and the other one is used to convey response information such as telemetry back to the 
+to send command messages, and the other one is used to broadcast response information such as telemetry back to the 
 commanding process.  Using this approach, the robot itself is "softly modeled" and can be significantly modified and 
 extended, often without changing the existing code, and could even "evolve" it's capabilities at runtime. 
 
-After launching with the robot command, the system provides a command console in a terminal window.  Three types of 
+After launching with the __robot__ command, the system provides a command console in a terminal window.  Three types of 
 commands are supported at the console: builtin, external and python.  Builtin commands are as follows:
 * __/r/power/angle__ - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees 
 from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180 is straight back.
@@ -99,8 +98,8 @@ from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180
 * __/d/song__ - Play the indicated song and dance to it.  (Command no longer supported in current version.)
 * __Shutdown__ - Shutdown the lbr software system
 
-Note that when operating the robot from a client, such as the web application, these commands derived from indications 
-expressed in the user interface and supplied automatically to the executive module for processing.  The command console
+Note that when operating the robot from a client, such as the web application, these commands are automatically derived 
+from actions in the user interface and supplied to the executive module for processing.  The command console
 provides a manual means of controlling the robot without a client and is also useful during development and testing. 
 
 External commands are added to the executive based on configurations in the metadata.  Typically, a command string 
@@ -124,7 +123,7 @@ The communications package contains modules that implement the supported communi
 * __publish/subscribe__ - A lightweight facility for publishing and subscribing to messages, both within processes and 
 between them.  Typical objects communicated are python named tuples, but messages are not type limited.  Subscribers
 often inspect an incoming message's type to determine how to process it.
-* authorization - A module to manage authorization tokens and authenticate users against them.  For example, tokens 
+* __authorization__ - A module to manage authorization tokens and authenticate users against them.  For example, tokens 
 are used in communications with the web client to authenticate and authorize users. 
 * __registration__ - A prototype module to register a robot with a centralized robotics service to facilitate further
 communications and updates.  Not fully implemented currently. 
@@ -154,17 +153,21 @@ as specified during configuration utilizing joinable queues.
 telemetry data. It operates the main system loop.  The minimum loop time is configurable and is currently set at 10ms.  
 If the system finishes all tasks executable in the current loop, the ops manager will wait until the remainder of the 
 minimum loop time expires before starting the next loop iteration.  Typically, loop tasks are completed within a few
-miliseconds.  This approach reduces cpu utilization and realistically aligns with the operating paradigm of the current
+milliseconds.  This approach reduces cpu utilization and realistically aligns with the operating paradigm of the current
 robot, i.e. a wheeled machine operating in a residential environment.  A much shorter loop time would be needed for a 
 flying robot, for example.  The ops manager keeps and logs statistics on operation timings to enable further tuning of 
 the system.  Excessively long loops, for example, typically indicate an error condition or bug has been encountered.
+    It is noted that the ops manager could be redesigned based on the asyncio package to further increase its efficiency.
+    The entire current system except for video conferencing utilizes about 15% of the CPU resources of a Raspberry Pi 3,
+    and while further improvements are desirable, this redesign hasn't reached a high enough priority yet.
+
 * __movement__ - The movement modules, notably __movepa.py__, translates the power and angle movement directives into 
 precise parameters to communicate to the motor controller.  The translation algorithm can be adjusted based on the 
 configuration of the robot motors and steering mechanisms.  The current robot employs tank like steering, as it has 
 left and right motors that operate independently.
 * __motion processing__ - Telemetry information is gathered from the 9 axis motion processing system and combined 
 with other information for use in adjusting operations and to communicate across the system.
-* __range__ - Operates the array of 4 ultrasonic range sensors and reports the distances forward, back, left and right
+* __range__ - Operates an array of 4 ultrasonic range sensors and reports the distances forward, back, left and right
 to the nearest object in each of those directions.
 * __observers__ - Observers look for a particular condition to occur based on sensor data and report their findings 
 back to the operations manager.  For example, a command to turn the robot by 45 degrees would launch a gyroscope 
@@ -182,26 +185,25 @@ The drivers package contains a collection of modules for interfacing physical de
 are python modules operating in user space, as opposed to typical low level kernel mode drivers.  In practice these
 drivers sit on top of their underlying operating system counterparts.  For example, if a device is connected to the 
 system via USB port, the operating system's serial driver implements the underlying interface, and the lbr python driver
-uses the serial interface to communicate semantically appropriate information between the device and the ops manager or
-other interested processes.  These modules might be useful on a standalone basis for people who happen to have these
+uses the serial interface to communicate semantically appropriate information between the device and the operations manager
+or other interested processes.  These modules might be useful on a standalone basis for people who happen to have these
 particular or similar devices and are in need of python drivers.
 
-* __motors__ - A driver for the Roboteq SDC2130 2X20Amp motor controller is provided.  This driver communicates over USB 
+* __motors__ - A driver for the __Roboteq SDC2130__ 2X20Amp motor controller is provided.  This driver communicates over USB 
 using Roboteq's proprietary protocol to manage motor operations and report on electrical conditions, including battery 
 voltage and the amount of current flowing through the motors.  The driver also implements a master feature toggle to
 enable or disable motor operations.  When disabled, the driver does all of it's normal operations except for actually 
 running the motors.  This toggle is useful during development and debugging, especially when there are potential safety
 concerns when a paricular operation is being developed.
-* __ultrasonic rangers__ - A driver to communicate over USB with a Parallax P8X32 microcontroller that has been 
-programmed to operate an array of 4 MaxBotix MB1220 ultrasonic range sensors.  A package of readings is gathered on 
-request and provided to the range operator running at the request of the operations manager.  The sensors gather a set of 
+* __ultrasonic rangers__ - A driver to communicate over USB with a __Parallax Propeller P8X32 MCU__ that has been 
+programmed to operate an array of 4 __MaxBotix MB1220 Ultrasonic Range Sensors__.  A package of readings is gathered on 
+request and provided to the range operator running at the request of the operations manager.  The sensors produce a set of 
 readings 10 times per second, and the range operator is set to request the data at the same rate.  Provisions were 
 made in the software to support a 5th sensor to check for bottom distance, in case for example, the robot is approaching
 a staircase, but that sensor is not installed in the current robot.  
-* __9 axis mpu__ A driver to communicate over the i2c bus with an InvenSense MPU9150 9 axis motion processing unit. The
-unit contains a 3 axis gyroscope, accelerometer and magnetometer.  Readings are gathered at the request of motion 
-processing operations in collaboration with the operations manager.  The MPU9150 is a complex device, and careful study of 
-its datasheet and other documents is required to operate it.  This driver configures and 
+* __9 axis mpu__ A driver to communicate over the i2c bus with an __InvenSense MPU9150 9 Axis Motion Processing Unit__. 
+The unit contains a 3 axis gyroscope, accelerometer and magnetometer.  Readings are gathered at the request of motion 
+processing operations in collaboration with the operations manager.  This driver configures and 
 operates the device according to the manufacturer's specifications and provides the data in a single, timestamped json 
 structure.  In addition to the 9 raw data streams plus the temperature reading, the driver calculates the compass heading 
 in degrees from the magnetometer readings.  Note that the driver does not tilt compensate the magnetometer readings 
@@ -211,9 +213,9 @@ procedure is referenced in the code. The current robot required only hard iron a
 calculated last in 2019.  Note that InvenSense does provide sdk's for driver development
 for more typical projects, but a lightweight python version was desired in this case.  The device contains additional proprietary 
 features for further onboard processing of the data streams to offload system cpu resources.  Utilizing those capabilites 
-requires a commercial releationship with InvenSense, and those were not implemented.
+requires a commercial releationship with InvenSense, and those were not implemented in this version.
 * __battery__ - A simple driver to map voltage readings from a 12 Volt, 35 Amp-Hour Absorbed Glass Mat (AGM) battery 
-into a state of charge table and report the ongoing status to interested processes, via the ops manager in this case.
+into a state of charge table and report the ongoing status to interested processes.
 * __av__ - A wrapper package to access audio visual capabilities of a Raspberry Pi 3 GPU.  This module is incomplete and
 not in significant use currently.
 * __mcu__ - For reference, the firmware source for the Parallax P8X32 MCU that is used to drive the range sensors is 
@@ -235,7 +237,7 @@ table specifies the conditions required to go on to any number of next states.  
 communicates via the REST api interface with the robot.  While the current configuration runs the state machine as an
 embedded component, it could operate from any connected location.
 
-    The format of the conditions supports
+    The state table format supports
 user specified tolerances for each condition.  For example, if a desired range is 40cm, a user might specify that ranges
 from 39 to 41cm are acceptable.  Tolerance management capabilities are key elements for operating complex systems. 
 Further, the state machine does not require specific knowledge of a particular telemetry package.  It searches the package 
@@ -245,22 +247,21 @@ state tables.
 
     The initial example usage of the application is the automatic docking procedure.  When the robot is
 in the room with the docking station, the autodock state table is executed to autonomously pilot the robot to the dock
-and verify that it is successfully being charged.  With this abstracted, csv driven approach, the state machine could 
+and verify that it is successfully being charged.  With this abstracted approach, the state machine could 
 serve as a type of "muscle memory" for behaviours that are complex but not necessarily intelligent on their own.  In 
 the future, coupling this capability with an AI that could design new behaviors and present them to the 
-state machine would mean that the robot could immediately "learn" new the behaviors dynamically without code changes.
+state machine would mean that the robot could immediately "learn" the new behaviors dynamically without code changes.
 
-* __IoT__ - An adaptation and implementation of an Amazon AWS sample program to facilitate communications with an 
+* __IoT__ - An adaptation and implementation of an Amazon AWS IoT sample program to facilitate communications with an 
 AWS IoT Core Thing Device Shadow.  Telemetry data is reported to the shadow, and desired states are retrieved from 
 the shadow.  Commanding the motors from the desired state information has not yet been tested, and note that the 
-currrent configuration is reporting shadow updates every 5 seconds.  Operating the motors would require shorter cycles.
+current configuration is reporting shadow updates every 5 seconds.  Operating the motors would require shorter cycles.
 
-    This application was developed in mid 2020 and is an exciting new avenue for the project.  The project predated 
+    This application was developed in 2020 and is an exciting new avenue for the project.  The project predated 
 Amazon's IoT services, and integrating with them would simplify any eventual production deployment and generally 
 accelerate access to cloud based capabilities.  For example, creating Alexa skills to operate the robot would be a 
 small incremental step from here.  In many ways, IoT exemplifies the distributed  architectural concepts that the 
 project was founded upon.
-
 
 
 ### Environment and Setup
@@ -288,40 +289,60 @@ A planned but not yet released feature for *settings.py* is to enable "fake devi
 exercised without requiring the robot hardware to be present.  This document will be updated when the feature is 
 available.
 
+### Code Style Notes
+Almost all of the code is written in python and currently requires python 3.5 or above.  The code style has evolved a
+bit over the years, and your kind patience is requested.  When the project was started, my most recent commercial 
+project that included personal coding was written in jython.  As we were using many Java libraries, we adopted 
+CamelCase.  Of course, the python community prefers snake_case, and I have come ultimately come back home to that, 
+although the previous packages have not been updated.  Also, users might notice that some packages and modules could 
+do with significant refactoring, which often happens with long lived code bases.  They are on "the list."  Finally, 
+some concepts have several different implementations across the code base.  That usually meant that each of them 
+were interesting topics to explore and compare with each other over the course of the project.  Obviously, those 
+would normally be optimized during commercialization.   
+
+Unit testing for each module is behind the
+ 
+    if __name__ == __main__:
+
+statement near the bottom of the module.  The main entry point module, robot.py, is an exception to this rule.  
+The others are not executed as mains at runtime except during unit testing.
+
 
 ## Hardware Overview
 The lbr development platform hardware was designed for flexibility and to support an ongoing set of experiments, including
-hardware upgrades over the life of the robot.  It was not designed for productization directly.  However, the telepresense
+hardware upgrades over the life of the robot.  It was not designed for productization directly.  However, the telepresence
 use case requires the robot to have a sufficient physical height to make video conferencing with remote users comfortable.
-The approximate overall dimensions of the robot are 56" X 17", and the system weighs approximately 35 pounds.
+The approximate overall dimensions of the robot are 56" X 17" X 12", and the system weighs about 35 pounds, with the battery
+being the heaviest component.
 
 * __Chassis__ - The frame is constructed from T6 aircraft aluminum, 1/8" thick and using a combination of 1" angle iron
-pieces and 1/8" aluminum sheets.  Internally, movable 1/4" acrylic shelves hold the electronics.  A removable riser is
+pieces and 1/8" sheets.  Internally, movable 1/4" acrylic shelves hold the electronics.  A removable riser is
 attached to the chassis to hold the monitor and video conferencing camera.  
 
-* __Motors and Drive Train__ - Two school bus windshield wiper gear motors from American Electric Motors are utilized.
-These motors have electromechanical specifications similar to electric wheelchair motors but are significantly 
-less expensive.  They have continued to perform well over the life of the platform.  The motors are mounted to the 
-chassis with custom aluminum mounts.  6" solid rubber garden cart wheels are attached to the motors.  Their nylon hubs
-are augmented and reinforced with steel hub assemblies backed with aluminum plates.  The wheel bearing surfaces 
-are interfaced to the drive shafts using stainless steel piping to form a precise and durable fit.  In early drive train
-testing, the chassis comfortably transported a 90 pound kit around the pool deck.  (Don't try this at home.)
+* __Motors and Drive Train__ - Designing the drive train for this development platform was approached as an exercise in
+practicality using readily available, off the shelf parts.  Two school bus windshield wiper gear motors from 
+American Electric Motors are utilized.  These motors have electromechanical specifications similar to electric wheelchair 
+motors but are significantly less expensive.  They have continued to perform well over the life of the platform.  The 
+motors are mounted to the chassis with custom aluminum mounts.  6" solid rubber garden cart wheels are attached to the 
+motors.  Their nylon hubs are augmented and reinforced with steel hub assemblies backed with aluminum plates.  The wheel 
+bearing surfaces are interfaced to the drive shafts using stainless steel piping to form a precise and durable fit.  
+In early drive train testing, the chassis comfortably transported a 90 pound kit around the pool deck.  (Don't try this at home.)
 
     My most significant regret in the original design is not including rotary encoders.  That additional data would 
     have made a lot of tasks with the software much more approachable, including autonomous mapping. 
   
 * __Electrical__ -  Automotive components are used in the electrical power section due to their easy availability and 
-overall reliability and since the system employs a 12V architecture.  The battery is a U1, 12V, 35 Amp-Hour AGM, which 
-provides a duty cycle of 6-8 hours in the current configuration.  Circuits are branched and fused using an automotive 
-fuse block.  A 100AMP safety switch that disconnects the battery from the system.  Note that a bypass wire protected 
+overall reliability and since the system employs a 12V electrical system.  The battery is a U1, 12V, 35 Amp-Hour AGM, which 
+provides a duty cycle of about 8 hours in the current configuration.  Circuits are branched and fused using an automotive 
+fuse block.  A 100AMP safety switch disconnects the battery from the system.  Note that a bypass wire protected 
 by a power diode should be added around the fuses and disconnect switch such that the motors always have a guaranteed 
 return path to the battery.  Otherwise, transients could damage the motor controller during a failure event.  
 The battery is charged by an external charging system mounted in the docking station.
 
 * __Computer__ - The original implementation was a windows based machine on a Mini ATX motherboard.  That 
-configuration in 2010 was a bit power hungry, but it worked well, and Skype was used for video conferencing (especially
+configuration in 2009 was a bit power hungry, but it worked well, and Skype was used for video conferencing (especially
 pre-acquisition).  Through a series of further experiments, the current main computer is a Raspberry Pi 3 4GB, which
-comfortably runs the lbr system exept for the video conferencing.  Currently, zoom conferencing runs on an additional
+comfortably runs the lbr system except for the video conferencing.  Currently, zoom conferencing runs on an additional
 windows stick.  It is likely that a future revision will settle on an Intel based Linux system that supports zoom, unless
 a custom video system is implemented.  The debate is underway.
 
@@ -330,7 +351,7 @@ The key characteristics of the monitor are that it operates on 12V and is HD, 19
 when its power is toggled.
 
 * __Cameras__ - The navigation camera is a Raspberry Pi V2 camera module with an 8MP Sony image sensor.  
-The video conferencing camera is Logitec C920 USB webcam.  Various camera configurations have been explored over time, 
+The video conferencing camera is Logitech C920 USB webcam.  Various camera configurations have been explored over time, 
 and it seems that the needs for navigation and video conferencing are sufficiently different that it is easier to have 
 two cameras in the design.  
 
@@ -343,13 +364,13 @@ used for powering the monitor, and the other one is used for the windows stick. 
 Raspberry Pi instead of the MCU.  The MCU is interfaced to the Raspberry PI over USB.
 
 * __Docking Station__ - The docking station transmits infrared signals that are used by the robot during docking, and it 
-also recieves signals.  The transceiver circuits are custom, and they are driven by a Parallax P8X32 MCU.  The communications
+also receives signals.  The transceiver circuits are custom, and they are driven by a Parallax P8X32 MCU.  The communications
 protocol is an implementation of the Sony IR remote standard.  The C source 
 for the docking firmware is not included in this repository but is available on request. The docking
-station also embeds a NOCO Genius AGM charging system.
+station embeds a NOCO Genius AGM charging system.
 
 Having read this far, you might be curious about why the project is called, "little brother robot."  When the project 
-started, my then 11 year old son came into the work shop and asked if I was building him a little brother.  I thought that
+started, my then 11 year old son came into the workshop and asked if I was building him a little brother.  I thought that
 was a cool way to think about it, and the name stuck.   
 
 

@@ -12,8 +12,8 @@ connecting with each other would be radically enhanced and begin to feel more na
 According to Verified Market Research, the global telepresence robot market was $181.6M USD in 2019 and is projected to 
 reach $789.1M by 2027, representing a 20.2% compound annual growth rate.  The telepresence products currently in the 
 market are primarily aimed at work environments, with healthcare being a 
-leading market driver.  As the technology continues to develop, better and more cost effective robots will become
-increasingly available for in home use.  Some of the initial in home use cases might well be extensions of the current 
+leading market driver.  As the technology continues to develop, better and more cost-effective robots will become
+increasingly available for in home use.  Some of the initial in-home use cases might well be extensions of the current 
 office use cases.  For example, being more deeply and continuously connected with family and community 
 might help people maintain their independence during periods of their lives that would have traditionally required 
 specialized facilities.  Imagine a robot that not only enables telepresence but is also equipped with sophisticated 
@@ -75,14 +75,14 @@ provides for startup and shutdown operations.
 
 A configuration module uses a sqllite database to store primary configuration information as metadata to specify 
 capabilities of the robot.  The configuration process reads the database and arranges for indicated processes to be 
-launched and connected together with various communications methods, typically python joinable queues, as specified in
+launched and connected with various communications methods, typically python joinable queues, as specified in
 the metadata.  The usual pattern is to create two joinable queues between connected processes.  One of them is used 
 to send command messages, and the other one is used to broadcast response information such as telemetry back to the 
 commanding process.  Using this approach, the robot itself is "softly modeled" and can be significantly modified and 
-extended, often without changing the existing code, and could even "evolve" it's capabilities at runtime. 
+extended, often without changing the existing code, and could even "evolve" its capabilities at runtime. 
 
 After launching with the __robot__ command, the system provides a command console in a terminal window.  Three types of 
-commands are supported at the console: builtin, external and python.  Builtin commands are as follows:
+commands are supported at the console: built-in, external and python.  Built-in commands are as follows:
 * __/r/power/angle__ - Run the motors at a power level between 0 and 1 at a steering angle between 0 and 360 degrees 
 from the robot's perspective, i.e. 0 degrees always mean straight ahead, and 180 is straight back.
 * __/r/power/angle/range/sensor/interval__ - Run the motors at the given power level and angle subject to constraints:
@@ -194,7 +194,7 @@ using Roboteq's proprietary protocol to manage motor operations and report on el
 voltage and the amount of current flowing through the motors.  The driver also implements a master feature toggle to
 enable or disable motor operations.  When disabled, the driver does all of it's normal operations except for actually 
 running the motors.  This toggle is useful during development and debugging, especially when there are potential safety
-concerns when a paricular operation is being developed.
+concerns when a particular operation is being developed.
 * __ultrasonic rangers__ - A driver to communicate over USB with a __Parallax Propeller P8X32 MCU__ that has been 
 programmed to operate an array of 4 __MaxBotix MB1220 Ultrasonic Range Sensors__.  A package of readings is gathered on 
 request and provided to the range operator running at the request of the operations manager.  The sensors produce a set of 
@@ -212,8 +212,8 @@ list.  In order to retrieve accurate magnetometer readings, hard and soft iron c
 procedure is referenced in the code. The current robot required only hard iron adjustments, which were 
 calculated last in 2019.  Note that InvenSense does provide sdk's for driver development
 for more typical projects, but a lightweight python version was desired in this case.  The device contains additional proprietary 
-features for further onboard processing of the data streams to offload system cpu resources.  Utilizing those capabilites 
-requires a commercial releationship with InvenSense, and those were not implemented in this version.
+features for further onboard processing of the data streams to offload system cpu resources.  Utilizing those capabilities 
+requires a commercial relationship with InvenSense, and those were not implemented in this version.
 * __battery__ - A simple driver to map voltage readings from a 12 Volt, 35 Amp-Hour Absorbed Glass Mat (AGM) battery 
 into a state of charge table and report the ongoing status to interested processes.
 * __av__ - A wrapper package to access audio visual capabilities of a Raspberry Pi 3 GPU.  This module is incomplete and
@@ -275,7 +275,7 @@ Supported environment variables are as follows:
 * ROBOT_CERT - Path to the robot's https certificate
 * ROBOT_KEY  - Path to the robot's private key for the https certificate
 * ROBOT_CA - Path to the robot's signing authority certificate 
-* ROBOT_USER - String containing the username assocatied with the APITOKEN to be authenticated
+* ROBOT_USER - String containing the username associated with the APITOKEN to be authenticated
 * ROBOT_APITOKEN - String containing the token for authenticating the current robot user to enable API access
 * ROBOT_AWS_CERT - Path to the certificate for accessing AWS IoT as a Thing
 * ROBOT_AWS_KEY - Path to the private key for use in communicating with AWS IoT
@@ -346,7 +346,7 @@ comfortably runs the lbr system except for the video conferencing.  Currently, z
 windows stick.  It is likely that a future revision will settle on an Intel based Linux system that supports zoom, unless
 a custom video system is implemented.  The debate is underway.
 
-* __Monitor__ - The monitor is an Eyoyo 12 Inch HD unit with builtin speakers, typically used in surveillance systems.  
+* __Monitor__ - The monitor is an Eyoyo 12 Inch HD unit with built-in speakers, typically used in surveillance systems.  
 The key characteristics of the monitor are that it operates on 12V and is HD, 1920x1080, and that it automatically turns on
 when its power is toggled.
 

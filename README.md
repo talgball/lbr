@@ -302,7 +302,7 @@ would normally be optimized during commercialization.
 
 Unit testing for each module is behind the
  
-    if __name__ == __main__:
+    if __name__ == '__main__':
 
 statement near the bottom of the module.  The main entry point module, robot.py, is an exception to this rule.  
 The others are not executed as mains at runtime except during unit testing.
@@ -326,7 +326,7 @@ motors but are significantly less expensive.  They have continued to perform wel
 motors are mounted to the chassis with custom aluminum mounts.  6" solid rubber garden cart wheels are attached to the 
 motors.  Their nylon hubs are augmented and reinforced with steel hub assemblies backed with aluminum plates.  The wheel 
 bearing surfaces are interfaced to the drive shafts using stainless steel piping to form a precise and durable fit.  
-In early drive train testing, the chassis comfortably transported a 90 pound kit around the pool deck.  (Don't try this at home.)
+In early drive train testing, the chassis comfortably transported a 90 pound kid around the pool deck.  (Don't try this at home.)
 
     My most significant regret in the original design is not including rotary encoders.  That additional data would 
     have made a lot of tasks with the software much more approachable, including autonomous mapping. 

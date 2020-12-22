@@ -37,12 +37,16 @@ __version__ = "1.0"
 # POSSIBILITY OF SUCH DAMAGE.
 
 
+import os
 import io
 import picamera
 import logging
 import socketserver
+import ssl
 from threading import Condition
 from http import server
+
+from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL
 
 PAGE="""\
 <html>
@@ -116,6 +120,24 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
 class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
+
+    def __init__(self, address, handler):
+        server.HTTPServer.__init__(self, address, handler)
+        self.set_security_mode()
+
+    def set_security_mode(self):
+        try:
+            if USE_SSL:
+                self.socket = ssl.wrap_socket(
+                    self.socket,
+                    server_side=True,
+                    certfile=os.environ['ROBOT_CERT'],
+                    keyfile=os.environ['ROBOT_KEY']
+                )
+        except Exception as e:
+            logging.error("Exception securing http server: {}".format(str(e)))
+
+
 
 with picamera.PiCamera(resolution='1920x1080', framerate=24) as camera:
     output = StreamingOutput()

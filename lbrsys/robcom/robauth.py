@@ -22,10 +22,27 @@ __version__ = "1.0"
 #  limitations under the License.
 
 
+import os
 import sys
 from collections import OrderedDict
-import secrets
 import hmac
+from base64 import b64encode
+from urllib.parse import quote
+
+try:
+    from secrets import token_urlsafe
+except ImportError:
+    def token_urlsafe(nbytes=None):
+        random_bytes = os.urandom(nbytes)
+        token = quote(b64encode(random_bytes).decode('utf-8'))
+        return token
+
+
+# setting the path here so that robauth.py can be
+#    executed interactively from here
+if __name__ == '__main__':
+    sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from lbrsys.settings import tokenFile
 
@@ -70,7 +87,7 @@ def save_single_token(user=None, token=None, token_file=DEFAULT_TOKEN_FILE):
 
 
 def make_user_token(user=None):
-    token = secrets.token_urlsafe(32)
+    token = token_urlsafe(32)
     api_tokens[user] = token
     save_single_token(user, token)
     return

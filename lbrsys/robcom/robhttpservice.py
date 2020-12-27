@@ -205,6 +205,17 @@ class RobHandler(BaseHTTPRequestHandler):
 
         return
 
+    def handle_telemetry(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        buffer = json.dumps(self.server.currentTelemetry).encode()
+        # json.dump(buffer, self.wfile)
+        self.wfile.write(buffer)
+
+        self.server.telemetry_sent = time.time()
+        # print("GET path: %s" % self.path)
+
 
     def handle_docksignal(self, msgD):
         # print("handling docksignal: %s" % json.dumps(msgD))
@@ -243,16 +254,31 @@ class RobHandler(BaseHTTPRequestHandler):
 
 
     def do_GET(self):
-        """ return current telemetry"""
-        self.send_response(200)
+        if self.path == '/validate':
+            logging.debug("/validate with headers %s" % str(self.headers))
+            if not self.is_user_authorized():
+                self.send_response(401)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(b'Validation failed.\r\n')
+                print("Validation failed")
+            else:
+                print("Validation succeeded")
+                self.send_response(200, 'ok')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(b'Validation succeeded.\r\n')
+            return
+
+
+        if self.path == '/telemetry':
+            self.handle_telemetry()
+            return
+
+        self.send_response(404)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        buffer = json.dumps(self.server.currentTelemetry).encode()
-        # json.dump(buffer, self.wfile)
-        self.wfile.write(buffer)
-
-        self.server.telemetry_sent = time.time()
-        # print("GET path: %s" % self.path)
+        self.wfile.write(b'Service not available.\r\n')
 
         return
 

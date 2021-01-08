@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 robregister.py - module to register the robot with server to facilitate communications
 """
@@ -25,7 +25,12 @@ import os
 import requests
 import sys
 
-sys.path.append('..')
+# setting the path here so that robregister.py can be
+#    executed interactively from here
+if __name__ == '__main__':
+    sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 
 from lbrsys.settings import robRegisterURL
 

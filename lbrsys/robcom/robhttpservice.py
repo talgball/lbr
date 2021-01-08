@@ -254,24 +254,25 @@ class RobHandler(BaseHTTPRequestHandler):
 
 
     def do_GET(self):
-        if self.path == '/validate':
+        if self.path.startswith('/validate'):
             logging.debug("/validate with headers %s" % str(self.headers))
             if not self.is_user_authorized():
                 self.send_response(401)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(b'Validation failed.\r\n')
-                print("Validation failed")
+                print("Validation for %s failed" % self.headers['User'])
+                self.log_message("Validation for %s failed", self.headers['User'])
             else:
-                print("Validation succeeded")
+                print("Validation for %s succeeded" % self.headers['User'])
+                self.log_message("Validation for %s succeeded", self.headers['User'])
                 self.send_response(200, 'ok')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(b'Validation succeeded.\r\n')
             return
 
-
-        if self.path == '/telemetry':
+        if self.path.startswith('/telemetry'):
             self.handle_telemetry()
             return
 

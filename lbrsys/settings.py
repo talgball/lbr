@@ -52,7 +52,7 @@ jitsiURL = "https://meet.jit.si/bfrobotics"
 # URL for the robot registration service for use in configuring peer to peer
 #   communications via WebRTC.  Full URL needed.
 #   This setting and feature is not used in version 1.0.
-robRegisterURL = "/robregister"
+robRegisterURL = "https://robots.bfrobotics.net/robregister"
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

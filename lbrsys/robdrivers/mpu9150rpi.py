@@ -91,11 +91,15 @@ class MPU9150_A:
 
 
     def __init__(self, port=MPU9150_ADDRESS, hix=-22.275, hiy=-11.3496):
+        self.port = port
         # hard iron offsets in uT measured on 2019-01-28 for lbr2a
         # for an untested device, set the default values to
         # hix = 0, hiy = 0
         self.hix        = hix
         self.hiy        = hiy
+        self.mpu_enabled = False
+        self.read_errors = 0
+        self.error_limit = 3
         self.mpuPub     = publisher.Publisher("MPU Message Publisher")
         self.gyroPub    = publisher.Publisher("Gyro Publisher")
         self.doPublish  = False # doPublish means publish even if the result 0
@@ -121,13 +125,22 @@ class MPU9150_A:
                                   self.zeroAccelResult,
                                   self.zeroMagResult,
                                   0.,0.,0.)
+        self.mpusu_zero = mpuData(self.zeroGyroResult,
+                                  self.zeroAccelResult,
+                                  self.zeroMagResult,
+                                  0., 0., 0.)
+
         self.lastRawAngle = -1
         self.unitConTime = 0
         self.numReads    = 0
+
+        self.setup()
+
+    def setup(self):
         
         try:
             # initialize the device here
-            self.mpu = port # legacy from when it was a serial device
+            self.mpu = self.port # legacy from when it was a serial device
             self.mag = MAG_ADDRESS
             
             # power up the device by selecting the gyro oscilator
@@ -165,6 +178,14 @@ class MPU9150_A:
             print("Failed to set gyro range")
         
         #todo set accel range
+
+        self.mpu_enabled = True
+
+    def reset(self):
+        self.close()
+        self.read_errors = 0
+        time.sleep(5) # todo - determine a good amount of time for the reset
+        self.setup()
 
 
     def sampleMagnetometer(self):
@@ -271,15 +292,23 @@ class MPU9150_A:
             slave mode easier, should the need arise.)
         """
 
+        if not self.mpu_enabled:
+            return self.mpusu_zero
+
+        if self.read_errors > self.error_limit:
+            print("Resetting MPU due to excessive read errors")
+            self.reset()
+            return self.mpusu_zero
+
         try:
             # self.sampleMagnetometer() # only in slave mode
             regs = self.bus.read_i2c_block_data(self.mpu, READINGS_START_REG,
                                                 READINGS_LEN)
         except IOError:
+            self.read_errors += 1
             print("Unexpected MPU read error:", sys.exc_info()[0])
             print("\treturning 0 result")
-            mpusu = mpuData(self.zeroGyroResult, self.zeroAccelResult, self.zeroMagResult, 0, 0, 0)
-            return mpusu
+            return self.mpusu_zero
             # raise
 
         t = robtimer()
@@ -363,7 +392,8 @@ class MPU9150_A:
         try:
             m = self.readMagnetometer()
         except Exception:
-           print("Magnetometer exception", sys.exc_info()[0])
+            self.read_errors += 1
+            print("Magnetometer exception", sys.exc_info()[0])
            
         '''
         # this has to be re-worked since readMagnetometer()                
@@ -473,6 +503,7 @@ class MPU9150_A:
 
                 
     def close(self):
+        self.mpu_enabled = False
         try:
             # self.mpu.close()
             # for the i2c version of the driver, interpret close as reset mpu

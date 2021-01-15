@@ -72,8 +72,31 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
         self.telemetry_sent = 0
         self.heartbeat_thread = None
         self.heartbeat = False
+        self.dockSignal_state = {
+            'time_to_live': 2.0,
+            'left': 0.0,    # timestamp of last left signal
+            'right': 0.0,
+        }
 
         self.set_security_mode()
+
+
+    def check_dockSignal(self):
+        for signal in ['left', 'right']:
+            try:
+                state = self.currentTelemetry['dockSignal'][signal]
+                if state == 1:
+                    if time.time() - self.dockSignal_state[signal] \
+                            > self.dockSignal_state['time_to_live']:
+
+                        # print("Clearing dockSignal: %s" % signal)
+                        self.currentTelemetry['dockSignal'][signal] = 0
+                        self.dockSignal_state[signal] = 0.0
+
+            except KeyError:
+                pass
+
+        return
 
 
     def set_security_mode(self):
@@ -113,6 +136,8 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
     def updateTelemetry(self):
         """Telemetry updater - run in a separate thread."""
         while True:
+            self.check_dockSignal()
+
             msg = self.receiveQ.get()
             # print("Updating telemetry: {}".format(str(msg)))
 
@@ -123,7 +148,27 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
             if type(msg) is feedback:  # todo - reexamine and look at voltages
                 if type(msg.info) is dict:
                     for k, v in msg.info.items():
-                        self.currentTelemetry[k] = v
+
+                        # for dockSignal updates, only replace the part of the telemetry
+                        #   provided by the current feedback message
+                        #   and note the time of the 1 signals to facilitate state /
+                        #   time to live management
+                        if k == 'dockSignal':
+                            if k not in self.currentTelemetry:
+                                self.currentTelemetry[k] = {}
+                            for signal in v.keys():
+
+                                self.currentTelemetry[k][signal] = v[signal]
+                                if signal == 'time':
+                                    continue
+                                if v[signal] == 1:
+                                    self.dockSignal_state[signal] = v['time']
+
+                        else:
+                            # for all other updates, replace the entire telemetry entry
+                            #   with the current message
+                            self.currentTelemetry[k] = v
+
                 else:
                     print("Please send telemetry feedback as dict: %s" % (msg.info))
 
@@ -220,12 +265,16 @@ class RobHandler(BaseHTTPRequestHandler):
     def handle_docksignal(self, msgD):
         # print("handling docksignal: %s" % json.dumps(msgD))
 
+        if not self.is_user_authorized():
+            return
+
         self.server.receiveQ.put(feedback(msgD))
 
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         return
+
 
     def is_user_authorized(self):
         try:

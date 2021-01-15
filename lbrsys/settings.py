@@ -61,7 +61,7 @@ dbfile = os.path.join(BASE_DIR, 'lbrsys/robot.sqlite3')
 
 # authorization token file for robot api
 # tokenFile = os.path.join(BASE_DIR, '')
-tokenFile = '/home/robot/Documents/dev/.cred/robauth.tokens'
+tokenFile = os.path.join(os.path.join(os.environ['ROBOT_CRED'], 'robauth.tokens'))
 
 # log directory and file configuration
 LOG_DIR = os.path.join(BASE_DIR, 'logs')

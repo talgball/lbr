@@ -5,7 +5,11 @@
     a service such as triggerhappy and is independent of lirc.  It uses the
     linux kernel built in gpio-ir capabilities.  Note that this module is
     executed once per relevant IR signal event and therefore needs to load and
-    run in less time than the interval between signals.
+    run in less time than the interval between signals.  In this version, the
+    time to live state management is implemented in the http service.  For
+    original docksignal, state management is implemented in the client since
+    it remains active during an entire session, as opposed to running only on
+    signal receipt.
 """
 
 __author__ = "Tal G. Ball"

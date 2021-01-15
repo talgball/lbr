@@ -82,6 +82,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
 
 
     def check_dockSignal(self):
+        '''Monitor time to live for docksignals.  Todo - generalize for any signals needing ttl'''
         for signal in ['left', 'right']:
             try:
                 state = self.currentTelemetry['dockSignal'][signal]

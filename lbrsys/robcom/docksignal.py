@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 """"
  docksignal.py - arrange to obtain docking signals from the active dock
-    and post them to httpservice
+    and post them to httpservice.  This version uses lirc and is intended to
+    remain active during an entire session.  Time to live state management for
+    the docking signals is managed here, unlike in the docksignal2 version.
+
 """
 
 __author__ = "Tal G. Ball"
@@ -145,6 +148,7 @@ if __name__ == '__main__':
     dockClient = DockSignal(robot, robot_url, user, apitoken)
     # dockClient.publisher.addSubscriber(genericSubscriber)
     dockClient.start()
+    # todo implement a shutdown mechanism short of sending a power IR signal
     time.sleep(3)
     dockClient.subscriber('Shutdown')
     dockClient.stop = True

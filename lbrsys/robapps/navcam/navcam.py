@@ -37,6 +37,7 @@ __version__ = "1.0"
 # POSSIBILITY OF SUCH DAMAGE.
 
 
+import sys
 import os
 import io
 import picamera
@@ -45,6 +46,10 @@ import socketserver
 import ssl
 from threading import Condition
 from http import server
+
+sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(3, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL
 

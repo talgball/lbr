@@ -60,7 +60,7 @@ class Observer(object):
         print("Initialized Observer for angle %s at %.4f" % \
               (self.targetAngle,time.clock()))
 
-    def update(self,reading):
+    def update(self, reading):
 
         if not isinstance(reading, gyro):
             return
@@ -81,26 +81,26 @@ class Observer(object):
         self.totalTime += deltat
         
         if angleSpeed != 0 and self.lastAngleSpeed == 0:
-            print('Turn started after %f' % (self.totalTime))
+            print('Turn started after %f' % self.totalTime)
                          
         self.cumulativeAngle += (angleSpeed + self.lastAngleSpeed)/2.0 * deltat
 
         self.dLF.write('%d\t%2.2f\t%.4f\t%.4f\t%.4f\t%.4f\n' %\
-                    (self.totalUpdates,angleSpeed,gyroReading.t,
-                     deltat,self.totalTime,self.cumulativeAngle))
+                    (self.totalUpdates, angleSpeed, gyroReading.t,
+                     deltat, self.totalTime, self.cumulativeAngle))
 
         self.lastAngleSpeed = angleSpeed
         self.lastTime = self.curtime
 
         if self.cumulativeAngle >= abs(self.targetAngle):
-            self.qOut.put(('Observed',self.cumulativeAngle,self.totalTime))
+            self.qOut.put(('Observed', self.cumulativeAngle, self.totalTime))
             self.observed = True
             reportStr = "Angle observed: %.2f, elapsed: %.4f, updates: %d, avg speed %.2f deg/sec"
             logging.debug(reportStr % \
-                          (self.cumulativeAngle,self.totalTime,
+                          (self.cumulativeAngle, self.totalTime,
                            self.totalUpdates, self.speedSum/self.totalUpdates))
             print(reportStr % \
-                          (self.cumulativeAngle,self.totalTime,
+                          (self.cumulativeAngle, self.totalTime,
                            self.totalUpdates, self.speedSum/self.totalUpdates))
             print("Completed at", time.asctime())
             

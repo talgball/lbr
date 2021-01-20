@@ -40,6 +40,7 @@ else:
     raise Exception()
 
 import sys
+sys.path.append('..') # for testing
 
 import time
 from time import time as robtimer # legacy naming issue
@@ -146,6 +147,9 @@ class MPU9150_A:
             # power up the device by selecting the gyro oscilator
             self.bus.write_byte_data(self.mpu, POWER_MGMT_1, 0x01)
 
+            # respect the 30ms startup time for the gyroscope
+            time.sleep(0.030)
+
             # enable slave i2c mode
             #self.bus.write_byte_data(self.mpu, USER_CTRL, 0x20)
 
@@ -173,18 +177,18 @@ class MPU9150_A:
             print("Unexpected error initializing MPU:", sys.exc_info()[0])
             raise  
 
+        self.mpu_enabled = True
 
         if not self.setGyroRange(250):
             print("Failed to set gyro range")
         
         #todo set accel range
 
-        self.mpu_enabled = True
 
     def reset(self):
         self.close()
         self.read_errors = 0
-        time.sleep(5) # todo - determine a good amount of time for the reset
+        time.sleep(2) # todo - determine a good amount of time for the reset
         self.setup()
 
 
@@ -483,10 +487,13 @@ class MPU9150_A:
                 caly += su.gyro.y
                 calz += su.gyro.z
                 recordCount += 1
-            
+
             # Read at ~50Hz instead of 200Hz full speed.
             # Just being conservative for calibration.
             time.sleep(0.020)
+
+        # print("Gyro Calibration: z total %f/ %d readings = %f degrees/sec" % (
+        #     calz, recordCount, calz/recordCount/Z_Convention))
 
         if recordCount != 0:
             result = gyro(  float(calx)/recordCount/X_Convention,
@@ -516,7 +523,6 @@ class MPU9150_A:
 
 
 if __name__ == '__main__':
-    sys.path.append('..')
     mpu = MPU9150_A() # note: can optionally pass a port name to the constructor
     # k = input("Press return to continue")
     rl = []

@@ -5,4 +5,12 @@ export PYTHONPATH="`( cd \"$BIN_PATH/..\" && pwd)`"
 if [ -z $PYTHONPATH ] ; then
     exit 1 # fail
 fi
+
+if [ -d $PYTHONPATH/venv ] ; then
+    source $PYTHONPATH/venv/bin/activate
+    # python --version 
+fi
+
 $PYTHONPATH/lbrsys/robexec/robot.py
+
+deactivate

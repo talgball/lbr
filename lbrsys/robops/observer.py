@@ -57,8 +57,8 @@ class Observer(object):
         self.sampleFileName = './gyrosample.log'
         self.sampleFile     = None
         logging.debug("Initialized Observer for angle %s" % (self.targetAngle,))
-        print("Initialized Observer for angle %s at %.4f" % \
-              (self.targetAngle,time.clock()))
+        print("Initialized Observer for angle %s at %s" % \
+              (self.targetAngle, time.ctime()))
 
     def update(self, reading):
 

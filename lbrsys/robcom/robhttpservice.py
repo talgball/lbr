@@ -73,7 +73,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
         self.heartbeat_thread = None
         self.heartbeat = False
         self.dockSignal_state = {
-            'time_to_live': 2.0,
+            'time_to_live': 3.0,
             'left': 0.0,    # timestamp of last left signal
             'right': 0.0,
         }

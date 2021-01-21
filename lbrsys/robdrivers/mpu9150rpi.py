@@ -51,6 +51,7 @@ from robcom import publisher
 from lbrsys import gyro, accel, mag, mpuData
 from lbrsys.settings import MPU9150_ADDRESS # typically 0x68
 from lbrsys.settings import X_Convention, Y_Convention, Z_Convention
+from lbrsys.settings import magCalibrationLogFile
 
 POWER_MGMT_1        = 0x6b
 GYRO_CONFIG         = 0x1b
@@ -91,7 +92,7 @@ class MPU9150_A:
                    2000:0x18 }
 
 
-    def __init__(self, port=MPU9150_ADDRESS, hix=-22.275, hiy=-11.3496):
+    def __init__(self, port=MPU9150_ADDRESS, hix=-17.9244, hiy=-15.01645):
         self.port = port
         # hard iron offsets in uT measured on 2019-01-28 for lbr2a
         # for an untested device, set the default values to
@@ -279,7 +280,7 @@ class MPU9150_A:
             raise
 
         return True
-    
+
 
     def read(self):
         """
@@ -508,7 +509,47 @@ class MPU9150_A:
         # print "gyro calibration %.2f,%.2f,%.2f" % (result.x,result.y,result.z)
         return result
 
-                
+
+    def calibrateMag(self, samples=500):
+        """
+        Execute calibration procedure to calculate the hard (and eventually soft)
+        iron adjustments.  Note that the robot must be in a safe location for spinning
+        around it's Z axis in order to collect the data.
+        :return:
+        """
+        cal_data = []
+
+        print("Collecting magnetometor calibration data.  Robot should be spinning about its z axis.")
+        for r in range(samples):
+            cal_data.append(self.read())
+            time.sleep(0.150)
+        print("Calibration data collected.")
+        print(f"Example: {str(cal_data[-1])}")
+
+        try:
+            with open(magCalibrationLogFile, 'w') as f:
+                print("X,Y,Z,Heading", file=f)
+                for r in cal_data:
+                    print(f"{r.mag.x},{r.mag.y},{r.mag.z},{r.heading}", file=f)
+
+            xmin = min([r.mag.x for r in cal_data])
+            ymin = min([r.mag.y for r in cal_data])
+            xmax = max([r.mag.x for r in cal_data])
+            ymax = max([r.mag.y for r in cal_data])
+
+            alpha = (xmax + xmin)/2
+            beta = (ymax + ymin)/2
+            self.hix = alpha
+            self.hiy = beta
+
+            print(f"Completed hard iron calibration with alpha {alpha}, beta {beta}")
+
+        except Exception as calexception:
+            print(f"Error calibrating magnetometer:\n{str(calexception)}")
+
+        return
+
+
     def close(self):
         self.mpu_enabled = False
         try:

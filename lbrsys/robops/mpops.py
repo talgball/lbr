@@ -35,6 +35,7 @@ if __name__ == '__main__':
     sys.path.append('..')
 
 from lbrsys import power, gyro, observeHeading, observeTurn
+from lbrsys import calibrateMagnetometer
 from lbrsys.settings import mpLogFile
 
 import robdrivers.mpu9150rpi
@@ -87,7 +88,7 @@ class MPservice(object):
             loopStartTime = robtimer()
             opsStats['numLoops'] += 1
 
-            mpuReading = self.mpu.read() # todo: process the rest of the stuff..
+            mpuReading = self.mpu.read()
             gyroReading = mpuReading.gyro
             #logging.debug("%s",(str(mpuReading),))
             
@@ -136,7 +137,7 @@ class MPservice(object):
             self.lastLogTime = time.time()
 
  
-    def execTask(self,task):
+    def execTask(self, task):
         logging.debug("executing mpops task: " + str(task))
 
         if isinstance(task, observeTurn):
@@ -147,6 +148,14 @@ class MPservice(object):
 
         if isinstance(task, observeHeading):
             headingObserver = self.addHeadingObserver(task.heading, self.broadcastQ)
+
+        if type(task) is calibrateMagnetometer:
+            try:
+                self.mpu.calibrateMag(task.samples)
+            except Exception as e:
+                print(f"Error calibrating magnetometer\n{str(e)}")
+            finally:
+                self.broadcastQ.put(power(0., 0))
 
 
     def addObserver(self,angle,qOut):

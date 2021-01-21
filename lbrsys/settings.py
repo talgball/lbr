@@ -49,6 +49,9 @@ Z_Convention = -1 # Z - clockwise and up are negative (e.g., gravity is down)
 # URL for experimental use of the Jitsi system for teleconferencing (not currently in use)
 jitsiURL = "https://meet.jit.si/bfrobotics"
 
+# uncomment the following line to automatically start the navigation camera
+LAUNCH_NAVCAM = True
+
 # URL for the robot registration service for use in configuring peer to peer
 #   communications via WebRTC.  Full URL needed.
 #   This setting and feature is not used in version 1.0.
@@ -78,3 +81,4 @@ speechLogFile  = os.path.join(LOG_DIR, 'speech.log')
 iotLogFile     = os.path.join(LOG_DIR, 'iot.log')
 rangeobserverLogFile = os.path.join(LOG_DIR, 'rangeobserver.log')
 headingobserverLogFile = os.path.join(LOG_DIR, 'headingobserver.log')
+magCalibrationLogFile = os.path.join(LOG_DIR, 'magCalibration.csv')

@@ -38,8 +38,13 @@ if __name__ == '__main__':
     sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from lbrsys.settings import robot_name, dbfile, robLogFile, BASE_DIR
+try:
+    from lbrsys.settings import LAUNCH_NAVCAM
+except:
+    LAUNCH_NAVCAM = False
+
 from lbrsys import power, nav
-from lbrsys import observeTurn, executeTurn, executeHeading
+from lbrsys import observeTurn, executeTurn, executeHeading, calibrateMagnetometer
 from lbrsys import speech, dance, feedback
 from lbrsys import channelMap
 
@@ -167,6 +172,11 @@ class Robot(object):
             mt.start()
 
         time.sleep(1)
+
+        # pre-launch navcam
+        if LAUNCH_NAVCAM and 'navcam' in self.r.extcmds:
+            self.execExt('navcam')
+
         self.mainEmbodied()
 
 
@@ -335,6 +345,12 @@ class Robot(object):
             elif cmd[0:3] == '/d/':
                 song = cmd[3:]
                 preparedCommand = dance(song)
+            elif cmd[0:3] == '/m/':
+                samples = int(cmd[3:])
+                if samples > 1000:
+                    print("Limiting calibration samples to 1000 max")
+                    samples = 1000
+                preparedCommand = calibrateMagnetometer(samples)
 
         else:
             preparedCommand = feedback(cmd)

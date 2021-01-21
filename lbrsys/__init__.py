@@ -38,6 +38,7 @@ executeTurn = namedtuple('executeTurn', 'angle')
 observeHeading = namedtuple('observeHeading', 'heading')
 executeHeading = namedtuple('executeHeading', 'heading')
 observeRange = namedtuple('observeRange', 'nav')
+calibrateMagnetometer = namedtuple('calibrateMagnetometer', 'samples')
 
 distance    = namedtuple('distance', 'n s e w t')
 
@@ -58,9 +59,11 @@ channelMap = {
         observeTurn, executeTurn,
         observeHeading, executeHeading,
         distance, nav, observeRange,
-        motorCommandResult},
+        motorCommandResult,
+        calibrateMagnetometer,
+    },
     'Speech': {speech},
     'Application': {feedback, dict},
     'Dance': {dance},
     'IoT': {iot},
-    }
+}

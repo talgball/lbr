@@ -33,6 +33,7 @@ from lbrsys.settings import opsLogFile
 from lbrsys import power, nav, voltages, amperages
 from lbrsys import gyro, accel, mag, mpuData
 from lbrsys import observeTurn, executeTurn, observeHeading, executeHeading
+from lbrsys import calibrateMagnetometer
 from lbrsys import observeRange, feedback
 
 import robdrivers
@@ -194,6 +195,12 @@ class Opsmgr(object):
                               (str(task), pa))
             else:
                 logging.debug('Invalid heading: ' + str(task))
+
+        if type(task) is calibrateMagnetometer:
+            logging.info("Executing magnegtometer calibration")
+            self.commandQ.put(power(0.2, 90))
+            self.mpucq.put(task)
+
 
         # dancing not supported in this version
         # for the moment, make dancing an operation.  It should be an application.

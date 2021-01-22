@@ -1,7 +1,6 @@
 """
 calibration.py - Execute calibration processes for sensors with complex
     requirements such as magnetometers.
-    THIS MODULE IS WIP and not yet integrated into the overall system.
 """
 
 __author__ = "Tal G. Ball"
@@ -24,13 +23,12 @@ __version__ = "1.0"
 
 import sqlite3
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Any
 
 from lbrsys.settings import robot_name, dbfile
 
 
 def load_calibrations():
-    print("running load")
     calibrations = []
     try:
         with sqlite3.connect(dbfile) as con:
@@ -41,7 +39,7 @@ def load_calibrations():
                 JOIN robot ON calibration.robot_id=robot.robot_id \
                 WHERE robot.name=?", (robot_name,))
 
-            calibrations = [CalibrationSetting(c['id'], c['robot_id'], c['name'], c['value'])
+            calibrations = [CalibrationSetting(c['robot_id'], c['name'], c['value'], c['id'])
                             for c in calibration_records]
 
     except Exception as e:
@@ -51,18 +49,74 @@ def load_calibrations():
 
 
 @dataclass
-class CalibrationSetting:
-    id: int
-    robot_id: str
+class CalibrationSetting: # todo consider eliminating id and making compound pk with robot_id and name
+    robot_id: int
     name: str
     value: float
+    id: int = 0
+    con: Any = None
+    cursor: Any = None
+
+    def __post_init__(self):
+        try:
+            self.con = sqlite3.connect(dbfile)
+            self.con.row_factory = sqlite3.Row
+            self.cursor = self.con.cursor()
+        except Exception as e:
+            print(f"Error connecting to calibrary database: {e}")
+
+
+    def save(self):
+        if self.id != 0:
+            try: # todo consider changing this to update based on id to ensure single record update
+                self.cursor.execute(
+                    "UPDATE calibration \
+                    SET value = ? \
+                    WHERE robot_id = ? AND name = ?",
+                    (self.value, self.robot_id, self.name))
+                self.con.commit()
+
+            except Exception as e:
+                print(f"Error saving calibration {self.name}={self.value}: {e}")
+        else:
+            try:
+                self.cursor.execute(
+                    "INSERT INTO calibration \
+                        (robot_id, name, value) \
+                    VALUES (?, ?, ?)", (self.robot_id, self.name, self.value))
+                self.con.commit()
+                r = self.cursor.execute(
+                    "SELECT * from calibration \
+                    WHERE robot_id = ? AND name = ? AND value = ?",
+                    (self.robot_id, self.name, self.value))
+                c = r.fetchone()
+                self.id = c['id']
+
+            except Exception as e:
+                print(f"Error saving calibration {self.name}={self.value}: {e}")
 
 
 @dataclass
 class Calibration:
     settings: List[CalibrationSetting] = field(default_factory=load_calibrations)
 
+    def find_setting(self, name, default=0.):
+        value = default
+        for s in self.settings:
+            if s.name == name:
+                value = s.value
+                break
+        return value
+
 
 if __name__ == '__main__':
     cal = Calibration()
     print(cal)
+
+    print("Saving new calibration setting")
+    new_cal = CalibrationSetting(1, 'NEWCAL', 123.456)
+    new_cal.save()
+    input("Press enter to continue: ")
+    print("Updating new calibration setting")
+    new_cal.value = 789.012
+    new_cal.save()

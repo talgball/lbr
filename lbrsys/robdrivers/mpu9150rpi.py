@@ -52,6 +52,8 @@ from lbrsys import gyro, accel, mag, mpuData
 from lbrsys.settings import MPU9150_ADDRESS # typically 0x68
 from lbrsys.settings import X_Convention, Y_Convention, Z_Convention
 from lbrsys.settings import magCalibrationLogFile
+from robdrivers.calibration import Calibration
+
 
 POWER_MGMT_1        = 0x6b
 GYRO_CONFIG         = 0x1b
@@ -92,13 +94,17 @@ class MPU9150_A:
                    2000:0x18 }
 
 
-    def __init__(self, port=MPU9150_ADDRESS, hix=-17.9244, hiy=-15.01645):
+    # def __init__(self, port=MPU9150_ADDRESS, hix=-17.9244, hiy=-15.01645):
+    def __init__(self, port=MPU9150_ADDRESS):
+
         self.port = port
         # hard iron offsets in uT measured on 2019-01-28 for lbr2a
         # for an untested device, set the default values to
         # hix = 0, hiy = 0
-        self.hix        = hix
-        self.hiy        = hiy
+        # self.hix        = hix
+        # self.hiy        = hiy
+        self.hix = 0
+        self.hiy = 0
         self.mpu_enabled = False
         self.read_errors = 0
         self.error_limit = 3
@@ -163,13 +169,17 @@ class MPU9150_A:
             #self.bus.write_byte_data(self.mpu, WRITE_TO_MAG, 0x01)
             #self.sampleMagnetometer()
 
-            # set mode to bypass for direct access from the host
+            # set mode to bypass for direct access to magnetometer from the host
             self.bus.write_byte_data(self.mpu, INT_PIN_CFG, 0x02)
 
             # get magnetometer sensitivity adjustments
             self.bus.write_byte_data(self.mag, MAG_CNTL, 0x0f)
             time.sleep(0.010)
             self.asa = self.bus.read_i2c_block_data(self.mag, MAG_SENS_ADJ, 3)
+
+            # get hard iron calibration adjustments
+            self.get_mag_calibration()
+            # print(f"mag calibrations: hix={self.hix}, hiy={self.hiy}")
 
             # queue up the first sensor run
             self.bus.write_byte_data(self.mag, MAG_CNTL, 0x01)
@@ -202,6 +212,12 @@ class MPU9150_A:
         self.bus.write_byte_data(self.mpu, MAG, MAG_READ_ADDRESS)
         self.bus.write_byte_data(self.mpu, MAG_REGISTER, MAG_STATUS1)
         self.bus.write_byte_data(self.mpu, MAG_CTRL, 0x88)
+        return
+
+    def get_mag_calibration(self):
+        cal = Calibration()
+        self.hix = cal.find_setting('MAG_ALPHA')
+        self.hiy = cal.find_setting('MAG_BETA')
         return
 
 

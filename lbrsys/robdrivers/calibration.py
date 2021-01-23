@@ -68,12 +68,12 @@ class CalibrationSetting: # todo consider eliminating id and making compound pk 
 
     def save(self):
         if self.id != 0:
-            try: # todo consider changing this to update based on id to ensure single record update
+            try:
                 self.cursor.execute(
                     "UPDATE calibration \
                     SET value = ? \
-                    WHERE robot_id = ? AND name = ?",
-                    (self.value, self.robot_id, self.name))
+                    WHERE id = ?",
+                    (self.value, self.id))
                 self.con.commit()
 
             except Exception as e:

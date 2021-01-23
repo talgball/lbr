@@ -29,6 +29,7 @@ import logging
 import queue
 
 from lbrsys import gyro
+from lbrsys.settings import gyroLogFile
 
 
 class Observer(object):
@@ -50,7 +51,7 @@ class Observer(object):
         self.totalTime      = 0
         self.speedSum       = 0
         self.observed       = False
-        self.dLF            = open('./gyrReadings.log','w')
+        self.dLF            = open(gyroLogFile, 'w')
         self.dLF.write("N\tz\tt\tdeltat\ttotalt\ttotala\n")
 
         self.testMode       = testMode

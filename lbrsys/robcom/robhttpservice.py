@@ -264,13 +264,7 @@ class RobHandler(BaseHTTPRequestHandler):
 
 
     def handle_docksignal(self, msgD):
-        # print("handling docksignal: %s" % json.dumps(msgD))
-
-        if not self.is_user_authorized():
-            return
-
         self.server.receiveQ.put(feedback(msgD))
-
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
@@ -279,6 +273,7 @@ class RobHandler(BaseHTTPRequestHandler):
 
     def is_user_authorized(self):
         try:
+            # print(str(self.headers))
             user = self.headers['User']
             token_type, token = self.headers['Authorization'].split(':')
             if token_type == 'TOK' and robauth.is_authorized(user, token):
@@ -345,8 +340,6 @@ class RobHandler(BaseHTTPRequestHandler):
            400 - bad post request, i.e. no power level provided (for now)
            401 - authentication failure
         """
-        # print("Headers: %s" % str(self.headers))
-
         tpstart = time.time()
 
         if not self.is_user_authorized():

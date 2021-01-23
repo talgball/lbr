@@ -83,11 +83,11 @@ class Opsmgr(object):
         self.rangeInterval      = 0.5
         self.lastRangeTime      = 0
         self.lastPowerTime      = 0.
-        self.stopPower          = power(0,0)
+        self.stopPower          = power(0, 0)
         self.lastPower          = self.stopPower
         self.rangeNoise         = 1
         self.lastVoltageAlarm   = robtimer() - self.alarmInterval
-        self.lastVoltage        = voltages(0.,0.,0.,0.)
+        self.lastVoltage        = voltages(0., 0., 0., 0.)
         #self.voltageInterval    = 180
         self.voltageInterval    = 15
         #self.voltageInterval     = 2

@@ -46,7 +46,7 @@ except:
 from lbrsys import power, nav
 from lbrsys import observeTurn, executeTurn, executeHeading, calibrateMagnetometer
 from lbrsys import speech, dance, feedback
-from lbrsys import channelMap
+from lbrsys import channelMap, command_map
 
 # These imports support dynamically launching robot processes during setup
 import robcom
@@ -293,7 +293,7 @@ class Robot(object):
         
         logging.debug("type of cmd '%s' is: %s" % (str(cmd),type(cmd)))
         
-        if type(cmd) is str:
+        if type(cmd) is str and cmd[0] != '/':
             cmdWords = cmd.split(' ')
             if len(cmdWords) == 1 and cmdWords[0].lower() == 'stop':
                 preparedCommand = power(0,0)
@@ -314,6 +314,36 @@ class Robot(object):
                 return None
 
         if type(cmd) is str and len(cmd) > 3:
+            rawfields = cmd.split('/')
+            fields = [f for f in rawfields if f != '']
+            command = fields[0]
+            if command in command_map:
+                params = []
+                mapentry = command_map[command]
+                cmdentry = mapentry[len(fields)]
+                cmdtype = list(cmdentry.keys())[0]
+                i = 1
+
+                # handle nav as a special case for now since it nests power
+                #   suggest generalizing to avoid adding further special cases
+                if cmdtype is nav:
+                    params.append(power(float(fields[i]), float(fields[i+1])))
+                    i += 2
+
+                for t in cmdentry[cmdtype]:
+                    if t is power:
+                        continue
+                    params.append(t(fields[i]))
+                    i += 1
+
+                preparedCommand = cmdtype(*params)
+            else:
+                print(f"Unknown command: {command}")
+                preparedCommand = None
+
+            # print(f"Test Prepared command: {str(preparedCommand)}")
+
+            ''' # Leaving this old block in for now while generalized version above is in testing
             if cmd[0:3] == '/r/':
                 values = cmd[3:].split('/')
                 if len(values) == 2:
@@ -346,19 +376,24 @@ class Robot(object):
                 song = cmd[3:]
                 preparedCommand = dance(song)
             elif cmd[0:3] == '/m/':
-                samples = int(cmd[3:])
+                fields = cmd[3:].split('/')
+                samples = int(fields[0])
                 if samples > 1000:
                     print("Limiting calibration samples to 1000 max")
                     samples = 1000
-                preparedCommand = calibrateMagnetometer(samples)
-
+                if len(fields) == 2:
+                    source = str(fields[1])
+                else:
+                    source = None
+                preparedCommand = calibrateMagnetometer(samples, source)
+            '''
         else:
             preparedCommand = feedback(cmd)
             #print "feedback: %s" % (str(cmd),)
             
         return preparedCommand
             
-      
+
     def end(self):
         #logging.debug('Shutting down..')
         print('Shutting down..')

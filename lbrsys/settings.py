@@ -6,6 +6,7 @@ specific ports and configuration options
 import os
 import socket
 
+
 robot_name = 'lbr2a'
 
 # set the port for use in the http service and find the ip address

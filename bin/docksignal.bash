@@ -4,6 +4,9 @@
 #	  Designed to be executed by triggerhappy or similar when infrared
 #   docking signal is received by robot kernel
 #
+#   Usage: docksignal.bash left|right|power
+#
+
 
 printf -v time '%(%s)T' -1
 signal=$1

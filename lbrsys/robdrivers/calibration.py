@@ -54,9 +54,10 @@ class CalibrationSetting: # todo consider eliminating id and making compound pk 
     name: str
     value: float
     id: int = 0
-    con: Any = None
-    cursor: Any = None
+    # con: Any = None
+    # cursor: Any = None
 
+    '''
     def __post_init__(self):
         try:
             self.con = sqlite3.connect(dbfile)
@@ -64,28 +65,35 @@ class CalibrationSetting: # todo consider eliminating id and making compound pk 
             self.cursor = self.con.cursor()
         except Exception as e:
             print(f"Error connecting to calibrary database: {e}")
-
+    '''
 
     def save(self):
         if self.id != 0:
             try:
-                self.cursor.execute(
-                    "UPDATE calibration \
-                    SET value = ? \
-                    WHERE id = ?",
-                    (self.value, self.id))
-                self.con.commit()
+                with sqlite3.connect(dbfile) as con:
+                    con.row_factory = sqlite3.Row
+                    cursor = con.cursor()
+                    cursor.execute(
+                        "UPDATE calibration \
+                        SET value = ? \
+                        WHERE id = ?",
+                        (self.value, self.id))
+                    con.commit()
 
             except Exception as e:
                 print(f"Error saving calibration {self.name}={self.value}: {e}")
         else:
             try:
-                self.cursor.execute(
-                    "INSERT INTO calibration \
-                        (robot_id, name, value) \
-                    VALUES (?, ?, ?)", (self.robot_id, self.name, self.value))
-                self.con.commit()
-                r = self.cursor.execute(
+                with sqlite3.connect(dbfile) as con:
+                    con.row_factory = sqlite3.Row
+                    cursor = con.cursor()
+
+                    cursor.execute(
+                        "INSERT INTO calibration \
+                            (robot_id, name, value) \
+                        VALUES (?, ?, ?)", (self.robot_id, self.name, self.value))
+                    con.commit()
+                r = cursor.execute(
                     "SELECT * from calibration \
                     WHERE robot_id = ? AND name = ? AND value = ?",
                     (self.robot_id, self.name, self.value))
@@ -102,11 +110,12 @@ class Calibration:
 
     def find_setting(self, name, default=0.):
         value = default
+        found = None
         for s in self.settings:
             if s.name == name:
                 value = s.value
                 break
-        return value
+        return value, found
 
 
 if __name__ == '__main__':

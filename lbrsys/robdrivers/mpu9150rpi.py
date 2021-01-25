@@ -48,11 +48,13 @@ from time import time as robtimer # legacy naming issue
 from math import *
 from robcom import publisher
 
-from lbrsys import gyro, accel, mag, mpuData
+from lbrsys import robot_id, gyro, accel, mag, mpuData
+from lbrsys.settings import LOG_DIR
 from lbrsys.settings import MPU9150_ADDRESS # typically 0x68
 from lbrsys.settings import X_Convention, Y_Convention, Z_Convention
 from lbrsys.settings import magCalibrationLogFile
-from robdrivers.calibration import Calibration
+from robdrivers.calibration import Calibration, CalibrationSetting
+from robdrivers.magcal import calc_mag_correction
 
 
 POWER_MGMT_1        = 0x6b
@@ -105,6 +107,8 @@ class MPU9150_A:
         # self.hiy        = hiy
         self.hix = 0
         self.hiy = 0
+        self.alpha_setting = None
+        self.beta_setting = None
         self.mpu_enabled = False
         self.read_errors = 0
         self.error_limit = 3
@@ -216,8 +220,8 @@ class MPU9150_A:
 
     def get_mag_calibration(self):
         cal = Calibration()
-        self.hix = cal.find_setting('MAG_ALPHA')
-        self.hiy = cal.find_setting('MAG_BETA')
+        self.hix, self.alpha_setting = cal.find_setting('MAG_ALPHA')
+        self.hiy, self.beta_setting = cal.find_setting('MAG_BETA')
         return
 
 
@@ -526,44 +530,84 @@ class MPU9150_A:
         return result
 
 
-    def calibrateMag(self, samples=500):
+    def calibrateMag(self, samples=500, source=None):
         """
         Execute calibration procedure to calculate the hard (and eventually soft)
         iron adjustments.  Note that the robot must be in a safe location for spinning
         around it's Z axis in order to collect the data.
+        :param: samples - the number of magnetometer readings to collect
+        :param: source - Collect new samples if None, otherwise read samples from path given by source.
         :return:
+        todo - simplify using numpy arrays
         """
-        cal_data = []
+        if samples > 1000:
+            print(f"Samples limited to 1000 instead of {samples}")
+            samples = 1000
 
-        print("Collecting magnetometor calibration data.  Robot should be spinning about its z axis.")
-        for r in range(samples):
-            cal_data.append(self.read())
-            time.sleep(0.150)
-        print("Calibration data collected.")
-        print(f"Example: {str(cal_data[-1])}")
+        cal_data = []
+        x = None
+        y = None
+
+        if source is None:
+            print("Collecting magnetometer calibration data.  Robot should be spinning about its z axis.")
+            for r in range(samples):
+                cal_data.append(self.read())
+                time.sleep(0.150)
+            print("Calibration data collected.")
+            print(f"Example: {str(cal_data[-1])}")
+
+            x = [r.mag.x for r in cal_data]
+            y = [r.mag.y for r in cal_data]
+
+            try:
+                self.save_cal_data(cal_data)
+            except Exception as e:
+                print(f"Error saving magnetometer samples:\n{str(e)}")
+                return
 
         try:
-            with open(magCalibrationLogFile, 'w') as f:
-                print("X,Y,Z,Heading", file=f)
-                for r in cal_data:
-                    print(f"{r.mag.x},{r.mag.y},{r.mag.z},{r.heading}", file=f)
+            if source is not None:
+                source_path = os.path.join(LOG_DIR, source)
+            else:
+                source_path = source
 
-            xmin = min([r.mag.x for r in cal_data])
-            ymin = min([r.mag.y for r in cal_data])
-            xmax = max([r.mag.x for r in cal_data])
-            ymax = max([r.mag.y for r in cal_data])
-
-            alpha = (xmax + xmin)/2
-            beta = (ymax + ymin)/2
+            alpha, beta, x_corrected, y_corrected = calc_mag_correction(x, y, source_path)
             self.hix = alpha
             self.hiy = beta
 
+            if self.alpha_setting is None:
+                self.alpha_setting = CalibrationSetting(robot_id, 'MAG_ALPHA', alpha)
+            else:
+                self.alpha_setting.value = alpha
+            self.alpha_setting.save()
+
+            if self.beta_setting is None:
+                self.beta_setting = CalibrationSetting(robot_id, 'MAG_BETA', beta)
+            else:
+                self.beta_setting.value = beta
+            self.beta_setting.save()
+
+            self.save_corrected(x_corrected, y_corrected)
             print(f"Completed hard iron calibration with alpha {alpha}, beta {beta}")
 
         except Exception as calexception:
             print(f"Error calibrating magnetometer:\n{str(calexception)}")
 
         return
+
+
+    def save_cal_data(self, cal_data):
+        with open(magCalibrationLogFile, 'w') as f:
+            print("X,Y,Z,Heading", file=f)
+            for r in cal_data:
+                print(f"{r.mag.x},{r.mag.y},{r.mag.z},{r.heading}", file=f)
+
+
+    def save_corrected(self, x, y):
+        with open(magCalibrationLogFile+'-corrected', 'w') as f:
+            print("X-Corrected,Y-Corrected", file=f)
+            for i in range(len(x)):
+                print(f"{x[i]},{y[i]}", file=f)
 
 
     def close(self):

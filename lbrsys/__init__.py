@@ -19,10 +19,14 @@ __version__ = "1.0"
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import sqlite3
+from collections import namedtuple
+
+from lbrsys.settings import dbfile, robot_name
+
 # Named tuple definitions are used across lbrsys to build objects for
 # communicating commands, state and feedback or telemetry between modules
 # and processes
-from collections import namedtuple
 power       = namedtuple('power',    'level angle')
 nav         = namedtuple('nav', 'power range sensor interval')
 voltages    = namedtuple('voltages', 'mainBattery internal vout time')
@@ -38,7 +42,7 @@ executeTurn = namedtuple('executeTurn', 'angle')
 observeHeading = namedtuple('observeHeading', 'heading')
 executeHeading = namedtuple('executeHeading', 'heading')
 observeRange = namedtuple('observeRange', 'nav')
-calibrateMagnetometer = namedtuple('calibrateMagnetometer', 'samples')
+calibrateMagnetometer = namedtuple('calibrateMagnetometer', 'samples source')
 
 distance    = namedtuple('distance', 'n s e w t')
 
@@ -67,3 +71,39 @@ channelMap = {
     'Dance': {dance},
     'IoT': {iot},
 }
+
+# command_map generalizes and streamlines console command processing
+#   in the prepare function.  Schema is as follows:
+#       {command_label: {num_fields_present: {command: [param_type,]}},}
+#
+#   prepare handles nav as a special case currently since it is the only nested command
+#
+command_map = {
+    'r': {3: {power: [float, float]}, 6: {nav: [power, float, str, float]}},
+    'a': {2: {observeTurn: [float]}},
+    't': {2: {executeTurn: [float]}},
+    'h': {2: {executeHeading: [float]}},
+    's': {2: {speech: [str]}},
+    'd': {2: {dance: [str]}},
+    'm': {3: {calibrateMagnetometer: [int, str]}},
+}
+
+
+def get_robot_id(name):
+    r_id = None
+    try:
+        with sqlite3.connect(dbfile) as con:
+            con.row_factory = sqlite3.Row
+            cursor = con.cursor()
+            robot_record = cursor.execute(
+                "SELECT robot_id FROM robot \
+                WHERE robot.name=?", (name,))
+            r_id = robot_record.fetchone()['robot_id']
+
+    except Exception as e:
+        print(f"Error getting robot id: {e}")
+
+    return r_id
+
+
+robot_id = get_robot_id(robot_name)

@@ -314,34 +314,47 @@ class Robot(object):
                 return None
 
         if type(cmd) is str and len(cmd) > 3:
-            rawfields = cmd.split('/')
-            fields = [f for f in rawfields if f != '']
-            command = fields[0]
-            if command in command_map:
-                params = []
-                mapentry = command_map[command]
-                cmdentry = mapentry[len(fields)]
-                cmdtype = list(cmdentry.keys())[0]
-                i = 1
+            preparedCommand = None
+            try:
+                rawfields = cmd.split('/')
+                fields = [f for f in rawfields if f != '']
+                command = fields[0]
+                if command in command_map:
+                    params = []
+                    mapentry = command_map[command]
+                    cmdentry = mapentry[len(fields)]
+                    cmdtype = list(cmdentry.keys())[0]
+                    i = 1
 
-                # handle nav as a special case for now since it nests power
-                #   suggest generalizing to avoid adding further special cases
-                if cmdtype is nav:
-                    params.append(power(float(fields[i]), float(fields[i+1])))
-                    i += 2
+                    # handle nav as a special case for now since it nests power
+                    #   suggest generalizing to avoid adding further special cases
+                    if cmdtype is nav:
+                        params.append(power(float(fields[i]), float(fields[i+1])))
+                        i += 2
 
-                for t in cmdentry[cmdtype]:
-                    if t is power:
-                        continue
-                    params.append(t(fields[i]))
-                    i += 1
+                    for t in cmdentry[cmdtype]:
+                        if t is power:
+                            continue
+                        params.append(t(fields[i]))
+                        i += 1
 
-                preparedCommand = cmdtype(*params)
-            else:
-                print(f"Unknown command: {command}")
-                preparedCommand = None
+                    preparedCommand = cmdtype(*params)
+                else:
+                    print(f"Unknown command: {command}")
 
-            # print(f"Test Prepared command: {str(preparedCommand)}")
+                # print(f"Test Prepared command: {str(preparedCommand)}")
+
+            except ValueError as e:
+                print(f"Value error preparing command: {str(cmd)}\n{str(e)}")
+
+            except KeyError as e:
+                print(f"Key error preparing command: {str(cmd)}\n{str(e)} - invalid parameter count")
+
+            except TypeError as e:
+                print(f"Type error preparing command: {str(cmd)}\n{str(e)}")
+
+            except Exception as e:
+                print(f"Unexpected error preparing command: {str(cmd)}\n{str(e)}")
 
             ''' # Leaving this old block in for now while generalized version above is in testing
             if cmd[0:3] == '/r/':

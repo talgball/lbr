@@ -4,7 +4,7 @@ calibration.py - Execute calibration processes for sensors with complex
 """
 
 __author__ = "Tal G. Ball"
-__copyright__ = "Copyright (C) 2020 Tal G. Ball"
+__copyright__ = "Copyright (C) 2021 Tal G. Ball"
 __license__ = "Apache License, Version 2.0"
 __version__ = "1.0"
 

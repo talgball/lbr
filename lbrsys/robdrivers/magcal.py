@@ -1,3 +1,29 @@
+"""
+magcal.py - Module to process calibration data for InvenSense MPU9150 and calculate
+    corrections and factors to apply to future readings to get calibrated results.
+    Currently, the "hard iron" adjustments of alpha and beta are supported, which are
+    the offsets that are applied to new readings to center them on the origin and
+    correct for any fixed magnetic field influences in the robot.
+"""
+
+__author__ = "Tal G. Ball"
+__copyright__ = "Copyright (C) 2021 Tal G. Ball"
+__license__ = "Apache License, Version 2.0"
+__version__ = "1.0"
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+
 
 import os
 import matplotlib.pyplot as plt

@@ -198,7 +198,7 @@ class Opsmgr(object):
 
         if type(task) is calibrateMagnetometer:
             logging.info("Executing magnegtometer calibration")
-            if task.source is None:
+            if task.source is None or task.source == '-':
                 self.commandQ.put(power(0.2, 90))
             self.mpucq.put(task)
 

@@ -548,7 +548,7 @@ class MPU9150_A:
         x = None
         y = None
 
-        if source is None:
+        if source is None or source == '-':
             print("Collecting magnetometer calibration data.  Robot should be spinning about its z axis.")
             for r in range(samples):
                 cal_data.append(self.read())
@@ -566,10 +566,10 @@ class MPU9150_A:
                 return
 
         try:
-            if source is not None:
+            if source is not None and source != '-':
                 source_path = os.path.join(LOG_DIR, source)
             else:
-                source_path = source
+                source_path = None
 
             alpha, beta, x_corrected, y_corrected = calc_mag_correction(x, y, source_path)
             self.hix = alpha

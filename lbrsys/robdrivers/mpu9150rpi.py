@@ -549,6 +549,8 @@ class MPU9150_A:
         y = None
 
         if source is None or source == '-':
+            self.hix = 0.
+            self.hiy = 0.
             print("Collecting magnetometer calibration data.  Robot should be spinning about its z axis.")
             for r in range(samples):
                 cal_data.append(self.read())

@@ -23,7 +23,7 @@ def get_records(path):
     return x, y
 
 
-def outliers(data, tolerance=3):
+def outliers(data, tolerance=2):
     sigma = statistics.stdev(data)
     mean = statistics.mean(data)
     boundary = tolerance * sigma

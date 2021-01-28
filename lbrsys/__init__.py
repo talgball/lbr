@@ -50,7 +50,7 @@ motorCommandResult = namedtuple('motorCommandResult',
                                 'status command reply time')
 
 dance       = namedtuple('dance', 'song')
-speech      = namedtuple('speech','msg')
+speech      = namedtuple('speech','msg save', defaults=(False,))
 feedback    = namedtuple('feedback','info')
 screen      = namedtuple('screen', 'power')
 iot         = namedtuple('iot', 'msg')
@@ -83,7 +83,7 @@ command_map = {
     'a': {2: {observeTurn: [float]}},
     't': {2: {executeTurn: [float]}},
     'h': {2: {executeHeading: [float]}},
-    's': {2: {speech: [str]}},
+    's': {2: {speech: [str]}, 3:{speech: [str, bool]}},
     'd': {2: {dance: [str]}},
     'm': {3: {calibrateMagnetometer: [int, str]}},
 }

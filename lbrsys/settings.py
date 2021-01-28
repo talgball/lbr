@@ -70,6 +70,9 @@ dbfile = os.path.join(BASE_DIR, 'lbrsys/robot.sqlite3')
 # tokenFile = os.path.join(BASE_DIR, '')
 tokenFile = os.path.join(os.path.join(os.environ['ROBOT_CRED'], 'robauth.tokens'))
 
+# audio directory
+AUDIO_DIR = os.path.join(BASE_DIR, 'media', 'audio')
+
 # log directory and file configuration
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 

@@ -27,8 +27,9 @@ import os
 import multiprocessing
 import threading
 import queue
+from datetime import datetime
 
-from lbrsys.settings import SPEECH_SERVICE, speechLogFile
+from lbrsys.settings import SPEECH_SERVICE, AUDIO_DIR, speechLogFile
 from lbrsys import speech
 
 if SPEECH_SERVICE == 'aws_polly':
@@ -75,8 +76,14 @@ class SpeechService:
                 break
             else:
                 #to do: add support for std dictionary
-                if type(task) == speech:
-                    self.tts.sayNow(task.msg)
+                if type(task) is speech:
+                    if not task.save:
+                        self.tts.sayNow(task.msg)
+                    else:
+                        file_name = f"{datetime.now()}.mp3"
+                        full_name = os.path.join(AUDIO_DIR, file_name)
+                        print(f"Saving audio file to {full_name}")
+                        self.tts.save(task.msg, full_name)
                 else:
                     self.tts.sayNow(str(task))
             

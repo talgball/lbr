@@ -95,6 +95,17 @@ class Robtts:
             self.say(text)
 
 
+    def save(self, text, fileName):
+        pollyResponse = self.engine.synthesize_speech(Engine='neural',
+                                                     Text=text,
+                                                     OutputFormat=self.output_format,
+                                                     VoiceId=self.voice_id)
+
+        with open(fileName, 'wb') as f:
+            f.write(pollyResponse['AudioStream'].read())
+            f.close()
+
+
 def main(testSentences, tts=None):
     if not tts:
         tts = Robtts()

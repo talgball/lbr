@@ -53,6 +53,9 @@ jitsiURL = "https://meet.jit.si/bfrobotics"
 # uncomment the following line to automatically start the navigation camera
 LAUNCH_NAVCAM = True
 
+# Set SPEECH_SERVICE = 'native' for a pyttsx3 based implementation or 'aws_polly' for cloud based speech
+SPEECH_SERVICE = 'aws_polly'
+
 # URL for the robot registration service for use in configuring peer to peer
 #   communications via WebRTC.  Full URL needed.
 #   This setting and feature is not used in version 1.0.

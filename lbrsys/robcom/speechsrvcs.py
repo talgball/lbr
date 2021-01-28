@@ -28,10 +28,13 @@ import multiprocessing
 import threading
 import queue
 
-from lbrsys.settings import speechLogFile
+from lbrsys.settings import SPEECH_SERVICE, speechLogFile
 from lbrsys import speech
 
-from robcom import robtts
+if SPEECH_SERVICE == 'aws_polly':
+    from robcom import robttspolly as robtts
+else:
+    from robcom import robtts
 
 proc = multiprocessing.current_process()
 

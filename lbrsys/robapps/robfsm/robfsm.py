@@ -187,6 +187,11 @@ class RobStateMachine(StateMachine):
             print("Max State Transitions Exceeded.")
             newState = self.endStates[1] # assumes second end state is failure
 
+        # process outputs, if any, for the end state before ending
+        if newState in self.endStates:
+            end_row = self.stateTransMap[newState]
+            self.doOutputs(end_row[0]['Outputs'])
+
         return newState, self.getTelemetry()
 
 

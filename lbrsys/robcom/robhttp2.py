@@ -120,7 +120,17 @@ class Client(object):
             self.response = ''
 
             try:
-                self.response = requests.post(self.robot_url, data=payload + '\r\n',
+                if type(payload) is tuple and len(payload) >= 2:
+                    # assumes trailing and leading '/' are not redundant
+                    #   convention - no trailing '/' on robot_url
+                    #       + leading '/' on payload[1]
+                    url = f"{self.robot_url}{payload[1]}"
+                    post_payload = payload[0]
+                else:
+                    url = self.robot_url
+                    post_payload = payload
+
+                self.response = requests.post(url, data=post_payload + '\r\n',
                                               headers=self.headers, verify=self.robot_ca)
 
             except Exception as e:

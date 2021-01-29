@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# saytest - speech post testing utility
+#   Usage: saytest text| \>text
+#
+
+
+printf -v time '%(%s)T' -1
+text=$1
+
+make_speech_json() {
+  cat <<EOF
+  {"speech": {"time": $time, "text": "$text"}}
+EOF
+}
+
+payload="$(make_speech_json)"$'\r'$'\n'
+
+curl --cacert $ROBOT_CA -H "Content-Type: application/json" \
+  -H "User: $ROBOT_USER" -H "Authorization: TOK:$ROBOT_APITOKEN" \
+  -X POST --data "$payload" $ROBOT_URL/say

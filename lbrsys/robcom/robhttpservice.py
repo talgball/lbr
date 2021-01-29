@@ -226,7 +226,13 @@ class RobHandler(BaseHTTPRequestHandler):
             self.server.sendQ.put(command)
             self.send_response(200)
         else:
-            self.send_response(400)
+            if 'speech' not in msgD:
+                self.send_response(400)
+
+        if 'speech' in msgD:
+            self.handle_say_noreply(msgD)
+            if command is None:
+                self.send_response(200)
 
         if self.server.newTelemetry:
             self.server.newTelemetry = False
@@ -271,15 +277,24 @@ class RobHandler(BaseHTTPRequestHandler):
         return
 
 
-    def handle_say(self, msgD):
+    def handle_say_noreply(self, msgD):
         try:
-            speech_command = f"/s/{msgD['speech']['text']}"
+            if 'text' in msgD['speech']:
+                speech_command = f"/s/{msgD['speech']['text']}"
+            else:
+                speech_command = f"/s/{msgD['speech']}"
+
         except KeyError:
             speech_command = f"/s/Bad speech post: {str(msgD)}"
         except Exception as e:
             speech_command = f"/s/Unexpected error in speech command: {str(msgD)}\n{str(e)}"
 
         self.server.sendQ.put(speech_command)
+        return
+
+
+    def handle_say(self, msgD):
+        self.handle_say_noreply(msgD)
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()

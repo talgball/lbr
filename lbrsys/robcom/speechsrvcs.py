@@ -62,9 +62,7 @@ class SpeechService:
 
 
     def start(self):
-
-        self.tts.sayStdNow("Hello")
-        # self.tts.sayNow("Hello")
+        self.tts.sayStdNow(">Hello")
 
         while True:
             # don't need the more sophisticated loop since this is essentially
@@ -72,18 +70,25 @@ class SpeechService:
             task = self.commandQ.get()
 
             if task == 'Shutdown':
-                self.tts.sayStdNow("Goodbye")
+                self.tts.sayStdNow(">Goodbye")
                 break
             else:
                 #to do: add support for std dictionary
                 if type(task) is speech:
-                    if not task.save:
-                        self.tts.sayNow(task.msg)
+                    if task.save == '':
+                        if task.msg[0] == '>':
+                            self.tts.sayStdNow(task.msg)
+                        else:
+                            self.tts.sayNow(task.msg)
                     else:
-                        file_name = f"{datetime.now()}.mp3"
-                        full_name = os.path.join(AUDIO_DIR, file_name)
-                        print(f"Saving audio file to {full_name}")
-                        self.tts.save(task.msg, full_name)
+                        if SPEECH_SERVICE == 'native':
+                            print("Speech save not supported for service native.")
+                        else:
+                            # file_name = f"{datetime.now()}.mp3"
+                            file_name = f"{task.save}.mp3"
+                            full_name = os.path.join(AUDIO_DIR, file_name)
+                            print(f"Saving audio file to {full_name}")
+                            self.tts.save(task.msg, full_name)
                 else:
                     self.tts.sayNow(str(task))
             

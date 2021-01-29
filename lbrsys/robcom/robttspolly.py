@@ -33,6 +33,8 @@ from pydub.playback import play
 from robcom.robmsgdict import messageDict
 from robcom import publisher
 
+from lbrsys.settings import AUDIO_DIR
+
 
 class Robtts:
     def __init__(self,language='English',rate=150, voice_id='Kevin'):
@@ -41,6 +43,7 @@ class Robtts:
                                    region_name='us-west-2').client('polly')
 
         self.output_format = 'mp3'
+        self.supported_formats = ['mp3', 'wav', 'mp4', 'amr', 'amr-wb', 'ogg', 'webm', 'flac']
         self.voice_id = voice_id
         self.language = language
         # self.engine.setProperty('rate', rate) # rate not currently used for this version
@@ -79,20 +82,28 @@ class Robtts:
         return
 
 
-    def sayStdNow(self,msgKey, language='English'):
-        if not language:
-            language = self.language
-        text = self.getText(msgKey, language)
-        if text:
-            self.sayNow(text)
+    def sayStdNow(self, msgKey, language='English'):
+        if msgKey[0] == '>':
+            speech_files = os.listdir(AUDIO_DIR)
+            for sf in speech_files:
+                fname = sf.split('.')
+                if len(fname) >= 2:
+                    if fname[-1] in self.supported_formats:
+                        fmt = fname[-1]
+                        if fname[0] == msgKey[1:].lower():
+                            sf_path = os.path.join(AUDIO_DIR, sf)
+                            # print(f"Matched saved audio file: {sf_path}")
+                            sound = AudioSegment.from_file(sf_path, format=fmt)
+                            play(sound)
+                            return
+
+        # by default, say as normal
+        self.say(msgKey)
+        return
 
 
     def sayStd(self, msgKey, language='English'):
-        if not language:
-            language = self.language
-        text = self.getText(msgKey, language)
-        if text:
-            self.say(text)
+        return self.sayStdNow()
 
 
     def save(self, text, fileName):

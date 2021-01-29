@@ -271,6 +271,21 @@ class RobHandler(BaseHTTPRequestHandler):
         return
 
 
+    def handle_say(self, msgD):
+        try:
+            speech_command = f"/s/{msgD['speech']['text']}"
+        except KeyError:
+            speech_command = f"/s/Bad speech post: {str(msgD)}"
+        except Exception as e:
+            speech_command = f"/s/Unexpected error in speech command: {str(msgD)}\n{str(e)}"
+
+        self.server.sendQ.put(speech_command)
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        return
+
+
     def is_user_authorized(self):
         try:
             # print(str(self.headers))
@@ -361,6 +376,9 @@ class RobHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/docksignal':
             self.handle_docksignal(msgD)
+
+        elif self.path == '/say':
+            self.handle_say(msgD)
 
         return
 

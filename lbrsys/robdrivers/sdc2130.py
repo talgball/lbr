@@ -123,10 +123,11 @@ class SDC2130:
             self.controller.flush()
 
             # read the good echo, then the result
-            readBuffer = self.controller.read_until(b'\r')
+            readBuffer = self.controller.read_until(b'?V\r')
             if readBuffer == b'?V\r':
                 readBuffer = self.controller.read_until(b'\r')
             else:
+                print(f"Expected readBuffer '?V\r', got '{readBuffer}'")
                 readBuffer = b''
 
         except:
@@ -170,10 +171,11 @@ class SDC2130:
             self.controller.flush()
 
             # read the good echo, then read the result
-            readBuffer = self.controller.read_until(b'\r')
+            readBuffer = self.controller.read_until(b'?A\r')
             if readBuffer == b'?A\r':
                 readBuffer = self.controller.read_until(b'\r')
             else:
+                print(f"Expected readBuffer '?V\r', got '{readBuffer}'")
                 readBuffer = b''
 
         except:

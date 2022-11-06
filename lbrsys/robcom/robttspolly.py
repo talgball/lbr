@@ -83,7 +83,7 @@ class Robtts:
 
 
     def sayStdNow(self, msgKey, language='English'):
-        if msgKey[0] == '>':
+        if msgKey[0] == '<':
             speech_files = os.listdir(AUDIO_DIR)
             for sf in speech_files:
                 fname = sf.split('.')

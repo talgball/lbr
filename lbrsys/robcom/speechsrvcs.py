@@ -62,7 +62,7 @@ class SpeechService:
 
 
     def start(self):
-        self.tts.sayStdNow(">Hello")
+        self.tts.sayStdNow("<Hello")
 
         while True:
             # don't need the more sophisticated loop since this is essentially
@@ -70,13 +70,13 @@ class SpeechService:
             task = self.commandQ.get()
 
             if task == 'Shutdown':
-                self.tts.sayStdNow(">Goodbye")
+                self.tts.sayStdNow("<Goodbye")
                 break
             else:
                 #to do: add support for std dictionary
                 if type(task) is speech:
                     if task.save == '':
-                        if task.msg[0] == '>':
+                        if task.msg[0] == '<':
                             self.tts.sayStdNow(task.msg)
                         else:
                             self.tts.sayNow(task.msg)

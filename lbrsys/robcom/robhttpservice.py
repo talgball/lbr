@@ -301,6 +301,18 @@ class RobHandler(BaseHTTPRequestHandler):
         return
 
 
+    def handle_wakeup(self, msgD):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        msg = f"lbrsys is already awake"
+        logging.info(msg)
+        print(msg)
+
+        return
+
+
     def is_user_authorized(self):
         try:
             # print(str(self.headers))
@@ -394,6 +406,9 @@ class RobHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/say':
             self.handle_say(msgD)
+
+        elif self.path == '/wakeup':
+            self.handle_wakeup(msgD)
 
         return
 

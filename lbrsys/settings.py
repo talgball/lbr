@@ -7,7 +7,7 @@ import os
 import socket
 
 
-robot_name = 'lbr2a'
+robot_name = 'lbr6'
 
 # set the port for use in the http service and find the ip address
 # for the robot
@@ -24,17 +24,18 @@ _s.close()
 # set USE_SSL = True to enable https for the http service
 #   Using this feature requires environment variables ROBOT_CERT and ROBOT_KEY
 #   to point to the certificate and private key files
-USE_SSL = True
+USE_SSL = False
 
 
 # set the port for connecting to a Roboteq SDC2130 motor controller
-SDC2130_Port = '/dev/ttyACM0'
+SDC2130_Port = '/dev/ttyACM2'
 
 # set the port for getting range and potentially other sensor data
 #   In the default case, a Parallax Propeller P8X32 microcontroller is
 #   producing range data using an array of Maxbotix MB1220 ultrasonic
 #   range sensors
-P8X32_1_Port = '/dev/ttyUSB0'
+# P8X32_1_Port = '/dev/ttyUSB0'
+P8X32_1_Port = '/dev/ttyACM1'
 
 # i2c address for mpu9150 motion processing device
 MPU9150_ADDRESS = 0x68
@@ -51,10 +52,11 @@ Z_Convention = -1 # Z - clockwise and up are negative (e.g., gravity is down)
 jitsiURL = "https://meet.jit.si/bfrobotics"
 
 # uncomment the following line to automatically start the navigation camera
-LAUNCH_NAVCAM = True
+LAUNCH_NAVCAM = False
 
 # Set SPEECH_SERVICE = 'native' for a pyttsx3 based implementation or 'aws_polly' for cloud based speech
 SPEECH_SERVICE = 'aws_polly'
+# SPEECH_SERVICE = 'native'
 
 # URL for the robot registration service for use in configuring peer to peer
 #   communications via WebRTC.  Full URL needed.

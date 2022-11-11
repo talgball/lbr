@@ -124,7 +124,7 @@ class Robot(object):
                                 c['description']
                             )
                         )
-                        mt.setDaemon(True)
+                        mt.daemon = True
                         self.monitorThreads.append(mt)
                         
                 if c['source_process_id'] == p['process_id'] or \

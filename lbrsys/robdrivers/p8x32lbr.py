@@ -125,7 +125,8 @@ def printRanges(ranges,c=1.0):
            ranges['Ranges']['Left']    / c,
            ranges['Ranges']['Right']   / c,
            ranges['Ranges']['Back']    / c,
-           ranges['Ranges']['Deltat']  / 80000000.0 * 1000.0,
+           # ranges['Ranges']['Deltat']  / 80000000.0 * 1000.0,
+           ranges['Ranges']['Deltat'], # For lbr6, deltat is already in ms. todo refactor for different mcu
            ranges['Timestamp'] * 1000.0)))
 
 #

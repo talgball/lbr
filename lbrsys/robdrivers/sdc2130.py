@@ -295,10 +295,10 @@ class SDC2130:
                 print('\tSerial Exception: {}'.format(str(e)))
                 commandReply = b''
 
-            if commandReply == b'+':
+            if chr(commandReply) == '+':
                 result = motorCommandResult('Success',
                                             motorCommand, commandReply, t)
-            elif commandReply == b'-':
+            elif chr(commandReply) == '-':
                 result = motorCommandResult('Failure',
                           motorCommand, commandReply, t)
             else:

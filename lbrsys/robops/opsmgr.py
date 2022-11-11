@@ -48,8 +48,8 @@ if multiprocessing.current_process().name == "Robot Operations":
     # temporary debug hack for linux:
     # sys.stdout = open(opsLogFile,"a")
     logging.basicConfig(
-        level=logging.INFO,
-        # level=logging.DEBUG,
+        # level=logging.INFO,
+        level=logging.DEBUG,
         filename=opsLogFile,
         format='[%(levelname)s] (%(processName)-10s) %(message)s'
     )

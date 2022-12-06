@@ -28,7 +28,7 @@ USE_SSL = False
 
 
 # set the port for connecting to a Roboteq SDC2130 motor controller
-SDC2130_Port = '/dev/ttyACM2'
+SDC2130_Port = '/dev/ttyACM0'
 
 # set the port for getting range and potentially other sensor data
 #   In the default case, a Parallax Propeller P8X32 microcontroller is

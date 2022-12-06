@@ -251,6 +251,10 @@ class Robot(object):
 
     def execSend(self, preparedCommand):
         logging.debug("Robot Exec: Processing - {}".format(str(preparedCommand)))
+        #
+        # if type(preparedCommand) is power:
+        #     print(f"Robot Exec Processing {str(preparedCommand)}")
+
         for c in list(self.sendChannels.values()):
             if preparedCommand != 'Shutdown':
                 chanType = c[1]['type']

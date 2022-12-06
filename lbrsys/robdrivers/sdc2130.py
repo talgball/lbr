@@ -32,6 +32,7 @@ __version__ = "1.0"
 import sys
 import io
 import time
+import logging
 
 from serial import Serial, SerialException
 from serial import EIGHTBITS, PARITY_NONE, STOPBITS_ONE
@@ -276,7 +277,8 @@ class SDC2130:
             if chan2 < -1000 or chan2 > 1000:
                 chan2 = 0
 
-            self.motorCommand = b'!M %d %d\r' % (chan1, chan2)
+            self.motorCommand = b'!M %d %d\r' % (chan1*-1, chan2)
+            # todo refactor the -1, used for lbr6 to account for lack of left vs right motors
         else:
             self.motorCommand = motorCommand
         
@@ -308,7 +310,8 @@ class SDC2130:
             result = motorCommandResult('Disabled',
                                         motorCommand, '', t)
 
-        self.motorControlPub.publish(result)   
+        self.motorControlPub.publish(result)
+        logging.debug(result)
         return result 
 
 

@@ -38,7 +38,7 @@ class Movepa:
         a = curPower.angle
 
         if a==0 and p==0 :
-            #print 'stopping at ',time.asctime()
+            # print(f"{curPower}")
             pass
 
         if p > 1.0:
@@ -52,8 +52,7 @@ class Movepa:
         # standard 0 is always facing right
         throttle = int(sin((90-a)*pi/180.) * scale)
         steering = int(cos((90-a)*pi/180.) * scale)
-
-        # print p, a, ':', throttle, steering
+        # print(f'power: {p}, angle: {a}, throttle: {throttle}, steering: {steering}')
 
         if self.controller:
             result = self.controller.mixMotorCommand(throttle, steering)

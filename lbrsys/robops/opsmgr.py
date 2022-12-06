@@ -59,7 +59,8 @@ class Opsmgr(object):
     def __init__(self,
                  commandQ=None, broadcastQ=None,  # todo avoid calling with positional args
                  rangecq=None, rangebq=None,
-                 mpucq=None, mpubq=None):
+                 mpucq=None, mpubq=None
+                 ):
         self.commandQ   = commandQ
         self.broadcastQ = broadcastQ
         self.mpucq     = mpucq
@@ -100,7 +101,7 @@ class Opsmgr(object):
         self.rangeRules         = opsrules.RangeRules()
         self.adjustedTask       = power(0.,0.)
         self.lastPower          = power(0.,0.)
-        self.autoAdjust         = True # False means don't adjust for range
+        self.autoAdjust         = False # False means don't adjust for range
 
         self.lastRanges         = {'Ranges':{'Forward':0,'Left':0,'Right':0,
                                              'Bottom':0,'Back':0,'Deltat':0},

@@ -154,6 +154,12 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
         except Exception as e:
             logging.error("Exception securing http server: {}".format(str(e)))
 
+    def serve_forever(self, **kwargs):
+        try:
+            return super().serve_forever(**kwargs)
+        except KeyboardInterrupt:
+            print(f"Exiting navcam on keyboard interrupt.")
+
 
 # with picamera.PiCamera(resolution='1920x1080', framerate=24) as camera:
 # with camera.UVCCamera(resolution='1920x1080', framerate=30) as camera:

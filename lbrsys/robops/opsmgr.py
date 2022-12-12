@@ -117,7 +117,11 @@ class Opsmgr(object):
 
         logging.info("Instantiated Robot Operations")
         if self.commandQ:
+            print(f"Ops command queue is {commandQ}")
             self.start()
+        else:
+            logging.info(f"Ops not starting. No command queue.")
+            print(f"Ops not starting. No command queue.")
 
 
     def initializeDevices(self):
@@ -143,6 +147,7 @@ class Opsmgr(object):
             print("executing task: " + str(task))
 
         if type(task) is power:
+            print(f"Ops has power task {task}")
             self.lastPower = task
             self.requestedPower = task
             result = "no move result"
@@ -349,6 +354,7 @@ class Opsmgr(object):
 
 
     def start(self):
+        print("Ops is starting..")
         printRange = True
         # minLoopTime = 0.050 # todo look at variablizing minLoopTime to be able to speed up or slow down as needed
         minLoopTime = 0.010
@@ -359,7 +365,7 @@ class Opsmgr(object):
             loopStartTime = robtimer()
             if not self.commandQ.empty():
                 task = self.commandQ.get_nowait()
-                #print "task is:",task
+                print(f"Ops has task: {task}")
                 self.commandQ.task_done() # ensures queue doesn't hang
 
                 if task == 'Shutdown':

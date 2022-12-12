@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-navcam - Experiemental module to stream pycamera for use in robot navigation
+navcam - Experimental module to stream pycamera for use in robot navigation
     Code drawn from example in official picamera package
     http://picamera.readthedocs.io/en/latest/recipes2.html#web-streaming
     Modified by Tal G. Ball starting on December 12, 2018
@@ -156,7 +156,10 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 
 
 # with picamera.PiCamera(resolution='1920x1080', framerate=24) as camera:
-with camera.UVCCamera(resolution='1920x1080', framerate=30) as camera:
+# with camera.UVCCamera(resolution='1920x1080', framerate=30) as camera:
+# 1920x1080 was working, albeit laggy on Dec 8, 2022. After ubuntu upgrade, device fails
+#   to be readable at that setting
+with camera.UVCCamera(resolution='1280x720', framerate=30) as camera:
     output = StreamingOutput()
 
     #Uncomment the next line to change your Pi's Camera rotation (in degrees)

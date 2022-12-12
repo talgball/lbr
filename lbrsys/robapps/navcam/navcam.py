@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-navcam - Experiemental module to stream pycamera for use in robot navigation
+navcam - Experimental module to stream pycamera for use in robot navigation
     Code drawn from example in official picamera package
     http://picamera.readthedocs.io/en/latest/recipes2.html#web-streaming
     Modified by Tal G. Ball starting on December 12, 2018

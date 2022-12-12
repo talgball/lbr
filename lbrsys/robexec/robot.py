@@ -262,6 +262,7 @@ class Robot(object):
                     # logging.debug("Robot Exec: Sending - {}".format(str(c)))
                     # print("Robot Exec: Sending - {}".format(str(c)))
                     c[0].put(preparedCommand)
+                    print(f"command is: {preparedCommand}")
 
 
     def monitor(self,monitorQ):

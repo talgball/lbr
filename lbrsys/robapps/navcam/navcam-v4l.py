@@ -79,7 +79,7 @@ class StreamingOutput(object):
 
     def write(self, buf):
         # if buf.startswith(b'\xff\xd8'):
-        if buf[:2].tobytes() == b'\xff\xd8':  # For working with array.array
+        if bytes(buf[:2]) == b'\xff\xd8':  # For working with array.array
             # New frame, copy the existing buffer's content and notify all
             # clients it's available
             self.buffer.truncate()
@@ -164,9 +164,12 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 
 # with picamera.PiCamera(resolution='1920x1080', framerate=24) as camera:
 # with camera.UVCCamera(resolution='1920x1080', framerate=30) as camera:
-# 1920x1080 was working, albeit laggy on Dec 8, 2022. After ubuntu upgrade, device fails
+# 1920x1080 was working, albeit laggy on Dec 8, 2022. Camera now fails
 #   to be readable at that setting
-with camera.UVCCamera(resolution='1280x720', framerate=30) as camera:
+# defaulting to 640x360 at 15fps based on available measured performance
+# with camera.UVCCamera(resolution='1280x720', framerate=30) as camera:
+with camera.UVCCamera(resolution='640x360', framerate=15, memory='USERPTR') as camera:
+
     output = StreamingOutput()
 
     #Uncomment the next line to change your Pi's Camera rotation (in degrees)

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
 camera.py - UVC camera module, with partial emulation of PiCamera api
-    Borrows heavily from video.py by @fernandoemor and @artizirk from github
-    Adds class structure and PiCamera-like interface
+    Borrows from video.py by @fernandoemor and @artizirk from github
+    Adds class structure
+    Adds iotcl management approach from capture.c in the linux documentation
+    Adds PiCamera-like interface
     Adds focus on mjpeg, which I'm currently using for robot navigation
 """
 
@@ -39,16 +41,17 @@ from codetiming import Timer
 
 class UVCCamera(object):
     def __init__(self, device='/dev/video0', video_format='mjpeg',
-                 resolution='1280x720', framerate=30):
+                 resolution='1280x720', framerate=30, memory='USERPTR'):
         self.device = device
         self.video_format = video_format
         self.width, self.height = [int(r) for r in resolution.split('x')]
         self.framerate = framerate
+        self.memory = memory  # 'USERPTR' or 'MMAP'
         self.vd = None
         self.cp = None
         self.fmt = None
         self.req = None
-        self.requested_buffer_count = 2 #  Saw somewhere that ~3 is normal.  Seems less laggy at 1.
+        self.requested_buffer_count = 2  #  2 is min, 1 for filling and 1 for reading simultaneously
         self.buffers = []
         self.output = None
         self.streaming_thread = None
@@ -117,10 +120,23 @@ class UVCCamera(object):
             numerator = parm.parm.output.timeperframe.numerator
             denominator = parm.parm.output.timeperframe.denominator
             print(f"\ttime per frame: {numerator}/{denominator}")
-            # fcntl.ioctl(self.vd, VIDIOC_S_PARM, parm)  # just got with the defaults
+            if denominator != self.framerate and numerator == 1:
+                print(f"\tChanging to {self.framerate}fps...")
+                parm.parm.output.timeperframe.denominator = self.framerate
+                self.xioctl(VIDIOC_S_PARM, parm)
+                self.xioctl(VIDIOC_G_PARM, parm)
+                denominator = parm.parm.output.timeperframe.denominator
+                if self.framerate == denominator:
+                    print("\t\tConfirmed.")
+                else:
+                    print(f"\t\tFailed to change frame rate to {self.framerate}fps.  Rate is {denominator}fps.")
 
-            # self.prepare_buffers()
-            self.prepare_user_buffers()
+            if self.memory == 'USERPTR':
+                self.prepare_user_buffers()
+            else:
+                # default to memory map, 'MMAP'
+                self.prepare_buffers()
+            # todo consider refactoring / combining these two methods
 
         except Exception as e:
             print(f"Exception configuring camera: {e}")

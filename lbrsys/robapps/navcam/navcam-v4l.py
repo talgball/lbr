@@ -78,7 +78,8 @@ class StreamingOutput(object):
         self.condition = Condition()
 
     def write(self, buf):
-        if buf.startswith(b'\xff\xd8'):
+        # if buf.startswith(b'\xff\xd8'):
+        if buf[:2].tobytes() == b'\xff\xd8':  # For working with array.array
             # New frame, copy the existing buffer's content and notify all
             # clients it's available
             self.buffer.truncate()

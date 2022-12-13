@@ -168,7 +168,7 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 #   to be readable at that setting
 # defaulting to 640x360 at 15fps based on available measured performance
 # with camera.UVCCamera(resolution='1280x720', framerate=30) as camera:
-with camera.UVCCamera(resolution='640x360', framerate=15, memory='USERPTR') as camera:
+with camera.UVCamera(device='/dev/video0', resolution='640x360', framerate=15, memory='USERPTR') as camera:
 
     output = StreamingOutput()
 

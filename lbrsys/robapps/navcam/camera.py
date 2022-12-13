@@ -39,7 +39,7 @@ from codetiming import Timer
 
 
 
-class UVCCamera(object):
+class UVCamera(object):
     def __init__(self, device='/dev/video0', video_format='mjpeg',
                  resolution='1280x720', framerate=30, memory='USERPTR'):
         self.device = device
@@ -131,12 +131,7 @@ class UVCCamera(object):
                 else:
                     print(f"\t\tFailed to change frame rate to {self.framerate}fps.  Rate is {denominator}fps.")
 
-            if self.memory == 'USERPTR':
-                self.prepare_user_buffers()
-            else:
-                # default to memory map, 'MMAP'
-                self.prepare_buffers()
-            # todo consider refactoring / combining these two methods
+            self.prepare_buffers()
 
         except Exception as e:
             print(f"Exception configuring camera: {e}")
@@ -144,47 +139,37 @@ class UVCCamera(object):
 
         return self
 
-    def prepare_buffers(self):
+    def prepare_buffers(self, memory=None):
+        if memory is None:
+            memory = self.memory
+
+        if memory == 'USERPTR':
+            memory_type = V4L2_MEMORY_USERPTR
+        else:
+            # default to memory map if not using user allocated buffers
+            memory_type = V4L2_MEMORY_MMAP
+
         self.req = v4l2_requestbuffers()
         self.req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-        self.req.memory = V4L2_MEMORY_MMAP
         self.req.count = self.requested_buffer_count
+        self.req.memory = memory_type
         self.xioctl(VIDIOC_REQBUFS, self.req)  # request buffers
 
         for i in range(self.req.count):
             buf = v4l2_buffer()
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-            buf.memory = V4L2_MEMORY_MMAP
             buf.index = i
+            buf.memory = memory_type
             self.xioctl(VIDIOC_QUERYBUF, buf)
 
-            mm = mmap.mmap(self.vd.fileno(), buf.length, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
-                           offset=buf.m.offset)
-            self.buffers.append(mm)
-
-            # queue the buffer for capture
-            self.xioctl(VIDIOC_QBUF, buf)
-
-    def prepare_user_buffers(self):
-        self.req = v4l2_requestbuffers()
-        self.req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-        self.req.memory = V4L2_MEMORY_USERPTR
-        self.req.count = self.requested_buffer_count
-        self.xioctl(VIDIOC_REQBUFS, self.req)  # request buffers
-
-        for i in range(self.req.count):
-            buf = v4l2_buffer()
-            buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-            buf.memory = V4L2_MEMORY_USERPTR
-            buf.index = i
-            self.xioctl(VIDIOC_QUERYBUF, buf)
-
-            # mm = mmap.mmap(self.vd.fileno(), buf.length, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
-            #                offset=buf.m.offset)
-
-            user_buf = array.array('B', b'\x00'*buf.length)
-            buf.m.userptr = user_buf.buffer_info()[0]
-            self.buffers.append(user_buf)
+            if memory_type == V4L2_MEMORY_USERPTR:
+                user_buf = array.array('B', b'\x00' * buf.length)
+                buf.m.userptr = user_buf.buffer_info()[0]
+                self.buffers.append(user_buf)
+            else:
+                mm = mmap.mmap(self.vd.fileno(), buf.length, mmap.MAP_SHARED,
+                               mmap.PROT_READ | mmap.PROT_WRITE, offset=buf.m.offset)
+                self.buffers.append(mm)
 
             # queue the buffer for capture
             self.xioctl(VIDIOC_QBUF, buf)
@@ -286,7 +271,7 @@ if __name__ == '__main__':
     t0 = time.time()
     duration = 5.0
 
-    with UVCCamera() as camera:
+    with UVCamera(device='/dev/video0') as camera:
         print("Starting recording..")
         camera.start_recording(vid)
         time.sleep(duration)

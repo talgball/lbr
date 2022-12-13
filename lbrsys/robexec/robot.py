@@ -131,7 +131,7 @@ class Robot(object):
                    c['target_process_id'] == p['process_id']:
                     channelListForProcess.append(self.channels[c['id']])
                     channelDescriptionsForProcess.append(c['description'])
-                    
+
             p['channels'] = tuple(channelListForProcess)
             # p['channel_descriptions'] = "\n\t".join(d for d in channelDescriptionsForProcess)
             p['channel_descriptions'] = "\n\t".join(channelDescriptionsForProcess)
@@ -143,10 +143,14 @@ class Robot(object):
                     name=p['name'],
                     args=p['channels']
                 )
-                print("\nCreated Process: {0} with channels \n\t{1}".format(
+                print("\nCreated Process: {0} with channels \n\t{1} targeting {2}".format(
                     p['name'],
-                    p['channel_descriptions'])
+                    p['channel_descriptions'],
+                    p['target'])
                 )
+                # temporary - rmove this
+                if p['name'] == 'Robot Operations':
+                    p['channels'][0].put("Hello from robot!")
 
         # todo: merge this into one of the previous loops through the channels
         self.sendChannels = {}
@@ -260,9 +264,8 @@ class Robot(object):
                 chanType = c[1]['type']
                 if type(preparedCommand) in channelMap[chanType]:
                     # logging.debug("Robot Exec: Sending - {}".format(str(c)))
-                    # print("Robot Exec: Sending - {}".format(str(c)))
                     c[0].put(preparedCommand)
-                    print(f"command is: {preparedCommand}")
+                    # print(f"put {preparedCommand} in {str(c[0])}, {c[1]['description']}")
 
 
     def monitor(self,monitorQ):
@@ -361,53 +364,9 @@ class Robot(object):
             except Exception as e:
                 print(f"Unexpected error preparing command: {str(cmd)}\n{str(e)}")
 
-            ''' # Leaving this old block in for now while generalized version above is in testing
-            if cmd[0:3] == '/r/':
-                values = cmd[3:].split('/')
-                if len(values) == 2:
-                    preparedCommand = power(float(values[0]), float(values[1]))
-                elif len(values) == 5:
-                    #('nav', 'power range sensor interval')
-                    level = float(values[0])
-                    angle = float(values[1])
-                    range = float(values[2])
-                    sensor = values[3]
-                    interval = float(values[4])
-                    preparedCommand = nav(power(level, angle), range, sensor, interval)
-                else:
-                    print("Error parsing power command: {}".format(cmd))
-                    logging.error("Error parsing power command: {}".format(cmd))
-
-            elif cmd[0:3] == '/a/':
-                angle = cmd[3:]
-                preparedCommand = observeTurn(float(angle))
-            elif cmd[0:3] == '/t/':
-                angle = cmd[3:]
-                preparedCommand = executeTurn(float(angle))
-            elif cmd[0:3] == '/h/':
-                heading = cmd[3:]
-                preparedCommand = executeHeading(float(heading))
-            elif cmd[0:3] == '/s/':
-                msg = cmd[3:]
-                preparedCommand = speech(str(msg))
-            elif cmd[0:3] == '/d/':
-                song = cmd[3:]
-                preparedCommand = dance(song)
-            elif cmd[0:3] == '/m/':
-                fields = cmd[3:].split('/')
-                samples = int(fields[0])
-                if samples > 1000:
-                    print("Limiting calibration samples to 1000 max")
-                    samples = 1000
-                if len(fields) == 2:
-                    source = str(fields[1])
-                else:
-                    source = None
-                preparedCommand = calibrateMagnetometer(samples, source)
-            '''
         else:
             preparedCommand = feedback(cmd)
-            #print "feedback: %s" % (str(cmd),)
+            # print(f"feedback: {str(cmd)}")
             
         return preparedCommand
             

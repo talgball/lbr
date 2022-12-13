@@ -48,8 +48,8 @@ if multiprocessing.current_process().name == "Robot Operations":
     # temporary debug hack for linux:
     # sys.stdout = open(opsLogFile,"a")
     logging.basicConfig(
-        # level=logging.INFO,
-        level=logging.DEBUG,
+        level=logging.INFO,
+        # level=logging.DEBUG,
         filename=opsLogFile,
         format='[%(levelname)s] (%(processName)-10s) %(message)s'
     )
@@ -61,6 +61,7 @@ class Opsmgr(object):
                  rangecq=None, rangebq=None,
                  mpucq=None, mpubq=None
                  ):
+
         self.commandQ   = commandQ
         self.broadcastQ = broadcastQ
         self.mpucq     = mpucq
@@ -114,10 +115,8 @@ class Opsmgr(object):
         self.lastMpuTime        = 0
         self.mpuInterval        = 2
 
-
         logging.info("Instantiated Robot Operations")
         if self.commandQ:
-            print(f"Ops command queue is {commandQ}")
             self.start()
         else:
             logging.info(f"Ops not starting. No command queue.")
@@ -142,12 +141,12 @@ class Opsmgr(object):
         #results published by the controller. return values mainly for unit testing
 
     def execTask(self,task):
-        logging.debug("executing ops task: " + str(task))
+        logging.debug(f"executing ops task: {str(task)}")
+        logging.debug(f"\ttype of task is {type(task)}")
         if printTests:
             print("executing task: " + str(task))
 
         if type(task) is power:
-            print(f"Ops has power task {task}")
             self.lastPower = task
             self.requestedPower = task
             result = "no move result"
@@ -225,6 +224,7 @@ class Opsmgr(object):
                 self.commandQ.put(power(0, 0))
                 logging.debug("Stopped motors on missed observation")
 
+        logging.debug("execTask:  end of function")
 
     def adjustTask(self):
         result = "no move result"
@@ -365,7 +365,7 @@ class Opsmgr(object):
             loopStartTime = robtimer()
             if not self.commandQ.empty():
                 task = self.commandQ.get_nowait()
-                print(f"Ops has task: {task}")
+                logging.debug(f"Ops has task: {task}")
                 self.commandQ.task_done() # ensures queue doesn't hang
 
                 if task == 'Shutdown':
@@ -388,6 +388,7 @@ class Opsmgr(object):
                 self.execTask(task)
 
             self.checkController()
+
             dt = robtimer() - loopStartTime
             if dt > 1.0:
                 print("Long operations loop: %f after checking controller" % (dt,))

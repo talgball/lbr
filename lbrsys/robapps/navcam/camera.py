@@ -259,7 +259,7 @@ class UVCCamera(object):
         print(time_msg)
         print(f"\tAcquiring Frame: {(Timer.timers['FrameAcquisition']/self.frames_read*1000):0.2f}ms/frame")
         print(f"\t\tWaiting for Device: {(Timer.timers['Select']/self.frames_read*1000):0.2f}ms/frame")
-        print(f"\t\tReading Memory Map: {(Timer.timers['MMRead']/self.frames_read*1000):0.2f}ms/frame")
+        print(f"\t\tReading Frame from Buffer: {(Timer.timers['MMRead']/self.frames_read*1000):0.2f}ms/frame")
         print(f"\tWriting Frame: {(Timer.timers['FrameWrite']/self.frames_read*1000):0.2f}ms/frame")
         self.streaming_thread.join()  #todo add timeout and check is_alive
 
@@ -281,7 +281,7 @@ class UVCCamera(object):
 
 if __name__ == '__main__':
     print("Running local test to capture a few seconds of video")
-    vidfile = '/home/robot/tmp/video.mjpg'
+    vidfile = '/home/robot/tmp/video.mjpg'  # todo pass as arg
     vid = open(vidfile, 'wb')
     t0 = time.time()
     duration = 5.0

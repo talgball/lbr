@@ -35,18 +35,22 @@ import time
 import threading
 import array
 
-from codetiming import Timer
+from codetiming import Timer, TimerError
 
 
-
-class UVCamera(object):
+class UVCCamera(object):
+    """USB Video Class Camera Management"""
     def __init__(self, device='/dev/video0', video_format='mjpeg',
-                 resolution='1280x720', framerate=30, memory='USERPTR'):
+                 # resolution='1280x720', framerate=30, memory='USERPTR',
+                 # resolution='1920x1080', framerate=30, memory='USERPTR',
+                 resolution='640x360', framerate=24, memory='USERPTR',
+                 latency_timer=None):
         self.device = device
         self.video_format = video_format
         self.width, self.height = [int(r) for r in resolution.split('x')]
         self.framerate = framerate
         self.memory = memory  # 'USERPTR' or 'MMAP'
+        self.latency_timer = latency_timer
         self.vd = None
         self.cp = None
         self.fmt = None
@@ -73,9 +77,6 @@ class UVCamera(object):
 
     def __exit__(self, exc_type=None, exc_value=None, exc_tb=None):
         self.vd.close()
-        if self.output is not None:
-            self.output.flush()
-            self.output.close()
 
     def stream_on(self):
         return self.xioctl(VIDIOC_STREAMON, self.buf_type)
@@ -163,13 +164,13 @@ class UVCamera(object):
             self.xioctl(VIDIOC_QUERYBUF, buf)
 
             if memory_type == V4L2_MEMORY_USERPTR:
-                user_buf = array.array('B', b'\x00' * buf.length)
-                buf.m.userptr = user_buf.buffer_info()[0]
-                self.buffers.append(user_buf)
+                new_buf = array.array('B', b'\x00' * buf.length)
+                buf.m.userptr = new_buf.buffer_info()[0]
             else:
-                mm = mmap.mmap(self.vd.fileno(), buf.length, mmap.MAP_SHARED,
+                new_buf = mmap.mmap(self.vd.fileno(), buf.length, mmap.MAP_SHARED,
                                mmap.PROT_READ | mmap.PROT_WRITE, offset=buf.m.offset)
-                self.buffers.append(mm)
+
+            self.buffers.append(new_buf)
 
             # queue the buffer for capture
             self.xioctl(VIDIOC_QBUF, buf)
@@ -193,9 +194,12 @@ class UVCamera(object):
         while self.do_stream:
             self.read_frame()
 
+        self.latency_timer_stop()
         self.stream_off()
 
     def read_frame(self):
+        self.latency_timer_start()
+
         self.frame_timer.start()
         self.frame_acq_timer.start()
 
@@ -246,7 +250,34 @@ class UVCamera(object):
         print(f"\t\tWaiting for Device: {(Timer.timers['Select']/self.frames_read*1000):0.2f}ms/frame")
         print(f"\t\tReading Frame from Buffer: {(Timer.timers['MMRead']/self.frames_read*1000):0.2f}ms/frame")
         print(f"\tWriting Frame: {(Timer.timers['FrameWrite']/self.frames_read*1000):0.2f}ms/frame")
+
+        try:
+            print(f"Latency Estimate: {(Timer.timers['LatencyTimer']/self.frames_read*1000):0.2f}ms/frame")
+        except KeyError:
+            pass
+
         self.streaming_thread.join()  #todo add timeout and check is_alive
+
+    def latency_timer_start(self):
+        try:
+            self.latency_timer.start()
+        except AttributeError:
+            return
+        except TimerError:
+            return
+        except Exception as e:
+            raise e
+
+    def latency_timer_stop(self):
+        try:
+            self.latency_timer.stop()
+        except AttributeError:
+            return
+        except TimerError:
+            return
+        except Exception as e:
+            raise e
+
 
     def xioctl(self, request, arg):
         """Python version of wrapper to handle errors.
@@ -271,7 +302,7 @@ if __name__ == '__main__':
     t0 = time.time()
     duration = 5.0
 
-    with UVCamera(device='/dev/video0') as camera:
+    with UVCCamera(device='/dev/video0') as camera:
         print("Starting recording..")
         camera.start_recording(vid)
         time.sleep(duration)

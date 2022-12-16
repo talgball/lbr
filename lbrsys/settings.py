@@ -35,7 +35,7 @@ SDC2130_Port = '/dev/ttyACM1'
 #   producing range data using an array of Maxbotix MB1220 ultrasonic
 #   range sensors
 # P8X32_1_Port = '/dev/ttyUSB0'
-P8X32_1_Port = '/dev/ttyACM1'
+P8X32_1_Port = '/dev/ttyACM0'
 
 # i2c address for mpu9150 motion processing device
 MPU9150_ADDRESS = 0x68

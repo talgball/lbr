@@ -102,7 +102,7 @@ class Opsmgr(object):
         self.rangeRules         = opsrules.RangeRules()
         self.adjustedTask       = power(0.,0.)
         self.lastPower          = power(0.,0.)
-        self.autoAdjust         = False # False means don't adjust for range
+        self.autoAdjust         = True # False means don't adjust for range
 
         self.lastRanges         = {'Ranges':{'Forward':0,'Left':0,'Right':0,
                                              'Bottom':0,'Back':0,'Deltat':0},

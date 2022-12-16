@@ -38,17 +38,15 @@ from socketserver import ThreadingMixIn
 import os
 import ssl
 import time
-from time import time as robtimer
 import json
 import logging
 import multiprocessing
 import threading
-import socket
 
 from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL
 from lbrsys import feedback
 
-from robcom import robauth
+from lbrsys.robcom import robauth
 
 proc = multiprocessing.current_process()
 
@@ -67,7 +65,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
         self.sendQ = sendQ
         self.currentTelemetry = {'Ranges':{'Left':1,'Right':2,'Forward':3, 'Back':4, 'Bottom':5}}
         self.newTelemetry = True
-        self.t0 = robtimer()
+        self.t0 = time.time()
         self.motors_powered = 0
         self.telemetry_sent = 0
         self.heartbeat_thread = None
@@ -438,8 +436,8 @@ if __name__ == '__main__':
     
     p = multiprocessing.Process(target=startService,
                                 args=(receiveQ, sendQ,
-                                      # ('',9145)),
-                                      ('lbr2a.ballfamily.org',9145)),
+                                      ('',9145)),
+                                      # ('lbr6.ballfamily.org',9145)),
                                       #('127.0.0.1',9145)),
                                 name='Robot Http Service')                                 
 

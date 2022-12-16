@@ -51,6 +51,7 @@ import ssl
 from threading import Condition
 from http import server
 
+from codetiming import Timer
 import camera
 
 sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -87,7 +88,9 @@ class StreamingOutput(object):
                 self.frame = self.buffer.getvalue()
                 self.condition.notify_all()
             self.buffer.seek(0)
-        return self.buffer.write(buf)
+        w = self.buffer.write(buf)
+        camera.latency_timer_stop()
+        return w
 
     def flush(self):
         pass
@@ -162,24 +165,28 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
             print(f"Exiting navcam on keyboard interrupt.")
 
 
-# with picamera.PiCamera(resolution='1920x1080', framerate=24) as camera:
-# with camera.UVCCamera(resolution='1920x1080', framerate=30) as camera:
-# 1920x1080 was working, albeit laggy on Dec 8, 2022. Camera now fails
-#   to be readable at that setting
-# defaulting to 640x360 at 15fps based on available measured performance
-# with camera.UVCCamera(resolution='1280x720', framerate=30) as camera:
-with camera.UVCamera(device='/dev/video0', resolution='640x360', framerate=15, memory='USERPTR') as camera:
 
-    output = StreamingOutput()
+if __name__ == '__main__':
+    latency_timer = Timer(name='LatencyTimer', logger=None)
 
-    #Uncomment the next line to change your Pi's Camera rotation (in degrees)
-    # camera.rotation = 180
+    # with picamera.PiCamera(resolution='1920x1080', framerate=24) as camera:
+    # with camera.UVCCamera(resolution='1920x1080', framerate=30) as camera:
+    # 1920x1080 was working, albeit laggy on Dec 8, 2022. Camera now fails
+    #   to be readable at that setting
+    # defaulting to 640x360 at 15fps based on available measured performance
+    with camera.UVCCamera(resolution='640x360', framerate=24, latency_timer=latency_timer) as camera:
+    # with camera.UVCamera(device='/dev/video0', resolution='640x360', framerate=30, memory='USERPTR') as camera:
 
-    camera.start_recording(output, format='mjpeg')
+        output = StreamingOutput()
 
-    try:
-        address = ('', 9146)
-        server = StreamingServer(address, StreamingHandler)
-        server.serve_forever()
-    finally:
-        camera.stop_recording()
+        #Uncomment the next line to change your Pi's Camera rotation (in degrees)
+        # camera.rotation = 180
+
+        camera.start_recording(output, format='mjpeg')
+
+        try:
+            address = ('', 9146)
+            server = StreamingServer(address, StreamingHandler)
+            server.serve_forever()
+        finally:
+            camera.stop_recording()

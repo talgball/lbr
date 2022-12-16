@@ -31,7 +31,7 @@ import time
 import threading
 import queue
 
-from robcom import publisher
+from lbrsys.robcom import publisher
 
 
 class Client(object):
@@ -58,7 +58,7 @@ class Client(object):
         self.postQ = queue.Queue()
         self.postThread = threading.Thread(target=self.postService,
                                            name="Post Service Thread")
-        self.postThread.setDaemon(True)
+        self.postThread.daemon = True
         self.postThread.start()
 
     def setAuthToken(self, user=None, token=None):
@@ -174,6 +174,7 @@ if __name__ == '__main__':
 
     robot = os.environ['ROBOT']
     robot_url = os.environ['ROBOT_URL']
+    robot_url = "http://lbr6.ballfamily.org:9145"
     user = os.environ['ROBOT_USER']
     token = os.environ['ROBOT_APITOKEN']
 

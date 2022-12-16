@@ -174,7 +174,7 @@ if __name__ == '__main__':
     # 1920x1080 was working, albeit laggy on Dec 8, 2022. Camera now fails
     #   to be readable at that setting
     # defaulting to 640x360 at 15fps based on available measured performance
-    with camera.UVCCamera(resolution='640x360', framerate=24, latency_timer=latency_timer) as camera:
+    with camera.UVCCamera(resolution='640x360', framerate=15, latency_timer=latency_timer) as camera:
     # with camera.UVCamera(device='/dev/video0', resolution='640x360', framerate=30, memory='USERPTR') as camera:
 
         output = StreamingOutput()

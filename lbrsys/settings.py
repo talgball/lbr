@@ -24,7 +24,7 @@ _s.close()
 # set USE_SSL = True to enable https for the http service
 #   Using this feature requires environment variables ROBOT_CERT and ROBOT_KEY
 #   to point to the certificate and private key files
-USE_SSL = False
+USE_SSL = True
 
 
 # set the port for connecting to a Roboteq SDC2130 motor controller

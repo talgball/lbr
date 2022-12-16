@@ -9,6 +9,7 @@ __copyright__ = "Copyright (C) 2009-2020 Tal G. Ball"
 __license__ = "Apache License, Version 2.0"
 __version__ = "1.0"
 
+import logging
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -112,3 +113,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         print(("Authorizing: %s" % sys.argv[1]))
         make_user_token(sys.argv[1])
+    else:
+        ut = input("UserToken: ")
+        u, t = ut.split(':')
+        print(f"Authorization: {is_authorized(u, t)}")

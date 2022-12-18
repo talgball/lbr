@@ -38,11 +38,11 @@ typedef struct Sensor {
 }Sensor;
 
 Sensor sensors[NUMBER_OF_SENSORS] = {
-  {.name="Forward", .ctrlPin=7, .pingPin=4, .distance=50},
-  {.name="Left",    .ctrlPin=9, .pingPin=8, .distance=40},
-  {.name="Right",   .ctrlPin=7, .pingPin=4, .distance=30},
-  {.name="Back",    .ctrlPin=7, .pingPin=4, .distance=20},
-  {.name="Bottom",  .ctrlPin=0, .pingPin=0, .distance=10},
+  {.name="Forward", .ctrlPin=12, .pingPin=13, .distance=50},
+  {.name="Left",    .ctrlPin=0,  .pingPin=8, .distance=40},
+  {.name="Right",   .ctrlPin=0,  .pingPin=4, .distance=30},
+  {.name="Back",    .ctrlPin=0,  .pingPin=4, .distance=20},
+  {.name="Bottom",  .ctrlPin=0,  .pingPin=0, .distance=10},
 };
 
 long deltat = 0;
@@ -92,7 +92,6 @@ void loop() {
 
 unsigned long get_distance(Sensor *s) {
   
-  /*  This is the "real" process.  Disabled for now, until the sensors are physically installed
   // Trigger a ping
   digitalWrite(s->ctrlPin, HIGH);
   delayMicroseconds(SENSOR_TRIGGER_PW);
@@ -100,9 +99,9 @@ unsigned long get_distance(Sensor *s) {
 
   // Read the ping
   s->distance = pulseIn(s->pingPin, HIGH, SENSOR_TIMEOUT) / SPEED_OF_SOUND;
-  */
 
-  delayMicroseconds(SENSOR_TRIGGER_PW);  // remove this line when "real" process above is enabled
+
+  // delayMicroseconds(SENSOR_TRIGGER_PW);  // remove this line when "real" process above is enabled
  
   return(s->distance);
 }

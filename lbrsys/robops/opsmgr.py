@@ -354,7 +354,6 @@ class Opsmgr(object):
 
 
     def start(self):
-        print("Ops is starting..")
         printRange = True
         # minLoopTime = 0.050 # todo look at variablizing minLoopTime to be able to speed up or slow down as needed
         minLoopTime = 0.010

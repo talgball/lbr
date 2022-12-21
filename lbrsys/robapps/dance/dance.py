@@ -27,6 +27,8 @@ import sys
 import json
 import time
 import subprocess
+import wave
+import alsaaudio
 from threading import Thread
 
 # temporary approach to make the rest of lbrsys available to this app
@@ -52,6 +54,7 @@ class DanceApp(robhttp2.Client):
         self.songDataFile = self.musicDir + '/' + cur_dance.song + '.json'
         self.songData = self.get_song_data()
         self.t0 = 0.0
+        self.song_started = False
 
         if self.songData:
             self.moves = self.config_moves()
@@ -97,47 +100,98 @@ class DanceApp(robhttp2.Client):
     def move(self, cur_move):
         self.post(cur_move)
 
-    def play(self, song=None):
+    def play_aplay(self, song=None):
         if song is not None:
             _song = song
         else:
             _song = self.songWavFile
 
         try:
-            subprocess.run(['mplayer', _song])
+            subprocess.run(['aplay', _song])
         except Exception as e:
             print(f"Error playing {song}")
             raise e
 
+    def play(self, song=None):
+        """play from playwav.py from pyalsaaudio package, modified for this app"""
+        if song is not None:
+            _song = song
+        else:
+            _song = self.songWavFile
+
+        device = 'default' # todo externalize
+
+        with wave.open(_song, 'rb') as f:
+            format = None
+
+            # 8bit is unsigned in wav files
+            if f.getsampwidth() == 1:
+                format = alsaaudio.PCM_FORMAT_U8
+            # Otherwise we assume signed data, little endian
+            elif f.getsampwidth() == 2:
+                format = alsaaudio.PCM_FORMAT_S16_LE
+            elif f.getsampwidth() == 3:
+                format = alsaaudio.PCM_FORMAT_S24_3LE
+            elif f.getsampwidth() == 4:
+                format = alsaaudio.PCM_FORMAT_S32_LE
+            else:
+                raise ValueError('Unsupported format')
+
+            periodsize = f.getframerate() // 8
+
+            print('%d channels, %d sampling rate, format %d, periodsize %d\n' % (f.getnchannels(),
+                                                                                 f.getframerate(),
+                                                                                 format,
+                                                                                 periodsize))
+            #
+            device = alsaaudio.PCM(channels=f.getnchannels(), rate=f.getframerate(),
+                                   format=format, periodsize=periodsize, device=device)
+
+            data = f.readframes(periodsize)
+            while data:
+                # Read data from stdin
+                device.write(data)
+                self.song_started = True
+                data = f.readframes(periodsize)
+
     def start(self):
         song_thread = Thread(target=self.play, name="SongThread")
         song_thread.start()
-        time.sleep(1.2)
 
-        try:
-            cur_move_num = 0
-            cur_move = self.moves[cur_move_num % len(self.moves)]
-            t0 = time.time()
+        printed = False
+        while True:
+            if not self.song_started:
+                continue
+            else:
+                if not printed:
+                    print("Song started flag set.")
+                    printed = True
 
-            self.move(cur_move)
-
-            for beat in self.beats:
-                t_now = time.time()
-
-                if t_now < t0 + beat:
-                    time.sleep(t0 + beat - t_now)
-
-                cur_move_num += 1
+            try:
+                cur_move_num = 0
                 cur_move = self.moves[cur_move_num % len(self.moves)]
+                t0 = time.time()
+
                 self.move(cur_move)
 
-        except KeyboardInterrupt as kbi:
-            print(f"Stopping song.\n{kbi}")
-            self.move(power(0, 0))
-        finally:
-            self.move(power(0, 0))
+                for beat in self.beats:
+                    t_now = time.time()
 
-        song_thread.join()
+                    if t_now < t0 + beat:
+                        time.sleep(t0 + beat - t_now)
+
+                    cur_move_num += 1
+                    cur_move = self.moves[cur_move_num % len(self.moves)]
+                    self.move(cur_move)
+
+            except KeyboardInterrupt as kbi:
+                print(f"Stopping song.\n{kbi}")
+                self.move(power(0, 0))
+            finally:
+                self.move(power(0, 0))
+                break
+
+            song_thread.join()
 
 
 if __name__ == '__main__':

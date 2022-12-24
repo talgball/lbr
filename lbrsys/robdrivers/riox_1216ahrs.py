@@ -23,6 +23,8 @@ __version__ = "1.0"
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
+import sys
 import time
 # from time import time as robtimer # legacy naming issue
 from math import *
@@ -48,7 +50,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
     zeroAccelResult = accel(0.0,0.0,0.0)
     zeroMagResult = mag(0.0,0.0,0.0)
 
-    def __init__(self, port=RIOX_1216AHRS_Port, hix=0., hiy=0.):
+    def __init__(self, port=RIOX_1216AHRS_Port, hix=-17.025, hiy=4.8):
         super(RIOX, self).__init__(debug_mode=False, exit_on_interrupt=False)
         self.port = port
 
@@ -67,7 +69,8 @@ class RIOX(PyRoboteq.RoboteqHandler):
         self.onRecord   = False
 
         # range setting seems unsupported for the RIOX
-        self.gyroRange          = 250   # dps
+        # (gyroRange 4 is 1000 deg/sec) guessing for RIOX, 250, 500, 1000 or 2000 deg/sec
+        self.gyroRange          = 4
         self.gyroFullScaleRange = 2000  # dps
         self.gyroSquelch        = 0.09
         self.gyroCalibration    = self.zeroGyroResult
@@ -76,7 +79,8 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         #self.magDecl       = 13+55./60. # todo dynamically look up declination
         self.magDecl        = 0.
-        self.magResolution  = 0.3 # AK8975C for MPU9150, +4095 to -4096 : +-1229uT
+        # self.magResolution  = 0.3 # AK8975C for MPU9150, +4095 to -4096 : +-1229uT
+        self.magResolution  = 1.0
         self.asa            = [0.,0.,0.]  # sensitivy adjustments
 
         self.rawAngleL  = []
@@ -123,21 +127,21 @@ class RIOX(PyRoboteq.RoboteqHandler):
             lsb = mems[len(READ_ALL_MEMS):].split(':')
             if len(lsb) != 10:
                 self.read_errors += 1
-                print(f"Malformed mpu read: {mems}")
+                print(f"Malformed mpu read: {mems}", file=sys.stderr)
                 return self.lastsu
 
             try:
                 lsb = list(map(lambda x: int(x), lsb))
             except ValueError as e:
                 self.read_errors += 1
-                print(f"ValueError: {e}")
+                print(f"ValueError: {e}", file=sys.stderr)
                 return self.lastsu
 
             lsb += (t,)
-            # print(f"lsb = {lsb}")
+            # print(f"lsb = {lsb}", file=sys.stderr)
 
             mpusu = self.lsb2su(lsb)
-            # print(f"mpusu = {mpusu}")
+            # print(f"mpusu = {mpusu}", file=sys.stderr)
 
             self.mpuPub.publish(mpusu)
             self.gyroPub.publish(mpusu.gyro) # publish separately for legacy reasons..
@@ -149,8 +153,8 @@ class RIOX(PyRoboteq.RoboteqHandler):
             if self.read_errors > self.error_limit:
                 # print("Resetting MPU due to excessive read errors")
                 # self.reset()
-                print(f"MPU errors:{self.read_errors}, limit: {self.error_limit}")
-                print(f"\t{mems}")
+                print(f"MPU errors:{self.read_errors}, limit: {self.error_limit}", file=sys.stderr)
+                print(f"\t{mems}", file=sys.stderr)
 
             mpusu = self.lastsu
 
@@ -181,9 +185,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
         temperature = round((lsb[3] / 340. + 35), 1)
 
         # gyro in deg/sec
-        # gR = self.gyroRange
-        # gR = 1
-        gR = 5
+        gR = self.gyroRange
         calx = self.gyroCalibration.x
         caly = self.gyroCalibration.y
         calz = self.gyroCalibration.z
@@ -201,8 +203,8 @@ class RIOX(PyRoboteq.RoboteqHandler):
                  round(gL[2], 3),
                  round(t, 4))
 
-        # lsbadj = self.adjustSensitivity(lsb[7:10])
-        lsbadj = lsb[7:10]
+        # lsbadj = lsb[7:10]
+        lsbadj = self.adjustSensitivity(lsb[7:10])
 
         msu = [m * self.magResolution for m in lsbadj] # todo check this for RIOX
         msuadji = self.adjustIron(msu)
@@ -251,6 +253,86 @@ class RIOX(PyRoboteq.RoboteqHandler):
         hadj = [h[0]-self.hix, h[1]-self.hiy, h[2]]
         return hadj
 
+    def calibrateMag(self, samples=500, source=None):
+        """
+        Execute calibration procedure to calculate the hard (and eventually soft)
+        iron adjustments.  Note that the robot must be in a safe location for spinning
+        around it's Z axis in order to collect the data.
+        :param: samples - the number of magnetometer readings to collect
+        :param: source - Collect new samples if None, otherwise read samples from path given by source.
+        :return:
+        todo - simplify using numpy arrays
+        """
+        if samples > 1000:
+            print(f"Samples limited to 1000 instead of {samples}")
+            samples = 1000
+
+        cal_data = []
+        x = None
+        y = None
+
+        if source is None or source == '-':
+            self.hix = 0.
+            self.hiy = 0.
+            print("Collecting magnetometer calibration data.  Robot should be spinning about its z axis.")
+            for r in range(samples):
+                cal_data.append(self.read())
+                time.sleep(0.150)
+            print("Calibration data collected.")
+            print(f"Example: {str(cal_data[-1])}")
+
+            x = [r.mag.x for r in cal_data]
+            y = [r.mag.y for r in cal_data]
+
+            try:
+                self.save_cal_data(cal_data)
+            except Exception as e:
+                print(f"Error saving magnetometer samples:\n{str(e)}")
+                return
+
+        try:
+            if source is not None and source != '-':
+                source_path = os.path.join(LOG_DIR, source)
+            else:
+                source_path = None
+
+            alpha, beta, x_corrected, y_corrected = calc_mag_correction(x, y, source_path)
+            self.hix = alpha
+            self.hiy = beta
+
+            if self.alpha_setting is None:
+                self.alpha_setting = CalibrationSetting(robot_id, 'MAG_ALPHA', alpha)
+            else:
+                self.alpha_setting.value = alpha
+            self.alpha_setting.save()
+
+            if self.beta_setting is None:
+                self.beta_setting = CalibrationSetting(robot_id, 'MAG_BETA', beta)
+            else:
+                self.beta_setting.value = beta
+            self.beta_setting.save()
+
+            self.save_corrected(x_corrected, y_corrected)
+            print(f"Completed hard iron calibration with alpha {alpha}, beta {beta}")
+
+        except Exception as calexception:
+            print(f"Error calibrating magnetometer:\n{str(calexception)}")
+
+        return
+
+
+    def save_cal_data(self, cal_data):
+        with open(magCalibrationLogFile, 'w') as f:
+            print("X,Y,Z,Heading", file=f)
+            for r in cal_data:
+                print(f"{r.mag.x},{r.mag.y},{r.mag.z},{r.heading}", file=f)
+
+
+    def save_corrected(self, x, y):
+        with open(magCalibrationLogFile+'-corrected', 'w') as f:
+            print("X-Corrected,Y-Corrected", file=f)
+            for i in range(len(x)):
+                print(f"{x[i]},{y[i]}", file=f)
 
 
     def reset(self):

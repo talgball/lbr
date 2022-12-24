@@ -149,7 +149,7 @@ class Robot(object):
                     p['channel_descriptions'],
                     p['target'])
                 )
-                # temporary - rmove this
+                # temporary - remove this
                 if p['name'] == 'Robot Operations':
                     p['channels'][0].put("Hello from robot!")
 

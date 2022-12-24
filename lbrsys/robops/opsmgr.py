@@ -202,7 +202,7 @@ class Opsmgr(object):
                 logging.debug('Invalid heading: ' + str(task))
 
         if type(task) is calibrateMagnetometer:
-            logging.info("Executing magnegtometer calibration")
+            logging.info("Executing magnetometer calibration")
             if task.source is None or task.source == '-':
                 self.commandQ.put(power(0.2, 90))
             self.mpucq.put(task)

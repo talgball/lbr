@@ -38,9 +38,19 @@ from lbrsys import power, gyro, observeHeading, observeTurn
 from lbrsys import calibrateMagnetometer
 from lbrsys.settings import mpLogFile
 
-import robdrivers.mpu9150rpi
-from robops import observer
-from robops import headingobserver
+# import robdrivers.mpu9150rpi
+from lbrsys.robops import observer
+from lbrsys.robops import headingobserver
+
+from lbrsys.settings import RIOX_1216AHRS_Port
+
+# todo find a more elegant abstraction for the MPU
+if RIOX_1216AHRS_Port is not None:
+    import lbrsys.robdrivers.riox_1216ahrs as mpu_driver
+    MPU_CLASS = mpu_driver.RIOX
+else:
+    import lbrsys.robdrivers.mpu9150rpi as mpu_driver
+    MPU_CLASS = mpu_driver.MPU9150_A
 
 proc = multiprocessing.current_process()
 
@@ -53,7 +63,8 @@ class MPservice(object):
     def __init__(self,commandQ=None, broadcastQ=None):
         self.commandQ   = commandQ
         self.broadcastQ = broadcastQ
-        self.mpu       = robdrivers.mpu9150rpi.MPU9150_A()
+        # self.mpu       = robdrivers.mpu9150rpi.MPU9150_A()
+        self.mpu = MPU_CLASS()
         self.lastLogTime= 0
         self.observers  = []
         self.mpu.gyroPub.addSubscriber(self.genericSubscriber)
@@ -61,7 +72,8 @@ class MPservice(object):
         self.mpu.mpuPub.addSubscriber(self.genericSubscriber)
         self.mpu.mpuPub.addSubscriber(self.updateObservers)
         self.curtime = robtimer()
-        self.minLoopTime = 0.010
+        # self.minLoopTime = 0.010
+        self.minLoopTime = 0.100
         self.mpuLogInterval = 15.
         self.mpuReportInterval = 2.
         self.lastMpuReportTime = 0.

@@ -37,8 +37,12 @@ SDC2130_Port = '/dev/ttyACM1'
 # P8X32_1_Port = '/dev/ttyUSB0'
 P8X32_1_Port = '/dev/ttyACM0'
 
-# i2c address for mpu9150 motion processing device
+# For robots using i2c, address for mpu9150 motion processing device
 MPU9150_ADDRESS = 0x68
+
+# For robots using Riox (for AHRS and other io extender capabilities)
+# Set to None if not using RIOX
+RIOX_1216AHRS_Port = '/dev/ttyACM2'
 
 # directional and rotational conventions
 #   Motion processing device driver observes these conventions

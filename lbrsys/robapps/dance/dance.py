@@ -184,14 +184,14 @@ class DanceApp(robhttp2.Client):
                     cur_move = self.moves[cur_move_num % len(self.moves)]
                     self.move(cur_move)
 
-            except KeyboardInterrupt as kbi:
-                print(f"Stopping song.\n{kbi}")
+            except KeyboardInterrupt:
+                print(f"Stopping song on keyboard interrupt.")
                 self.move(power(0, 0))
             finally:
                 self.move(power(0, 0))
                 break
 
-            song_thread.join()
+        song_thread.join()
 
 
 if __name__ == '__main__':

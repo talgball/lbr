@@ -27,7 +27,8 @@ __version__ = "1.0"
 
 #define NUMBER_OF_SENSORS 5
 #define SENSOR_TRIGGER_PW 25 // mb1220 is 20us min
-#define SENSOR_TIMEOUT 50000 // mb1220 pw up to 58*765us
+// #define SENSOR_TIMEOUT 50000 // mb1220 pw up to 58*765us
+#define SENSOR_TIMEOUT 100000 // mb1220 pw up to 58*765us
 #define SPEED_OF_SOUND 58    // mb1220 returns round trip time (2*29us/cm)
 
 typedef struct Sensor {
@@ -65,7 +66,8 @@ void setup() {
     digitalWrite(sensors[i].ctrlPin, LOW);
   }
 
-  delay(500); // mb1220 has 175ms startup cycle and might be in a 100ms ranging cycle
+  delay(500); // mb1220 has 175ms startup cycle and might be in a 100ms ranging cycle.
+  // prelim testing indicates 100ms ranging cycle is min instead of typical. 
 }
 
 void loop() {
@@ -81,7 +83,7 @@ void loop() {
     }
     
     sensors[i].distance = get_distance(&sensors[i]);
-    delay(100); // not needed after we install the rest of the sensors
+    delay(200); // not needed after we install the rest of the sensors
   }
 
   report_sensors(sensors, deltat);

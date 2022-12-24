@@ -32,7 +32,8 @@ import time
 
 
 # setting the path here so that robot.py can be 
-#    executed interactively from here 
+#    executed interactively from here Shutdown
+
 if __name__ == '__main__':
     sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))

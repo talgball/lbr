@@ -109,7 +109,7 @@ class MPU9150_A:
         self.hiy = 0
         self.alpha_setting = None
         self.beta_setting = None
-        self.mpu_enabled = False
+        self.mpu_enabled = True
         self.read_errors = 0
         self.error_limit = 3
         self.mpuPub     = publisher.Publisher("MPU Message Publisher")

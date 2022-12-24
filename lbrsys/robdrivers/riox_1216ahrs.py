@@ -79,8 +79,8 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         #self.magDecl       = 13+55./60. # todo dynamically look up declination
         self.magDecl        = 0.
-        # self.magResolution  = 0.3 # AK8975C for MPU9150, +4095 to -4096 : +-1229uT
-        self.magResolution  = 1.0
+        self.magResolution  = 0.3 # AK8975C for MPU9150, +4095 to -4096 : +-1229uT, 0.3uT/LSB
+        # self.magResolution  = 1.0 # Assume already adjusted for RIOX case
         self.asa            = [0.,0.,0.]  # sensitivy adjustments
 
         self.rawAngleL  = []
@@ -203,10 +203,10 @@ class RIOX(PyRoboteq.RoboteqHandler):
                  round(gL[2], 3),
                  round(t, 4))
 
-        # lsbadj = lsb[7:10]
-        lsbadj = self.adjustSensitivity(lsb[7:10])
+        lsbadj = lsb[7:10]
+        # lsbadj = self.adjustSensitivity(lsb[7:10]) # No asa data for RIOX case
 
-        msu = [m * self.magResolution for m in lsbadj] # todo check this for RIOX
+        msu = [m * self.magResolution for m in lsbadj]
         msuadji = self.adjustIron(msu)
         self.lastm = mag(round(msuadji[0], 4),
                          round(msuadji[1], 4),

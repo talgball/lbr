@@ -36,6 +36,7 @@ gyro        = namedtuple('gyro',     'x y z t')
 accel       = namedtuple('accel',   'x y z')
 mag         = namedtuple('mag',   'x y z')
 mpuData     = namedtuple('mpuData', 'gyro accel mag heading temp time')
+euler       = namedtuple('euler', 'roll pitch yaw')
 
 observeTurn = namedtuple('observeTurn', 'angle')
 executeTurn = namedtuple('executeTurn', 'angle')

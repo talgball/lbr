@@ -67,7 +67,6 @@ void setup() {
   }
 
   delay(500); // mb1220 has 175ms startup cycle and might be in a 100ms ranging cycle.
-  // prelim testing indicates 100ms ranging cycle is min instead of typical. 
 }
 
 void loop() {
@@ -83,7 +82,7 @@ void loop() {
     }
     
     sensors[i].distance = get_distance(&sensors[i]);
-    delay(200); // not needed after we install the rest of the sensors
+    delay(100); // not needed after we install the rest of the sensors
   }
 
   report_sensors(sensors, deltat);

@@ -2,7 +2,8 @@
     Device driver for the Roboteq RIOX-1216AHRS.
 
         For this driver, importing PyRoboteq package, which is still under development
-        as noted on its pypi.org page.
+        as noted on its pypi.org page.  todo investigate why partial resulsts from RIOX
+        are sometimes returned, resulting in driver read errors.  Ignored for now.
 """
 
 
@@ -26,11 +27,12 @@ __version__ = "1.0"
 import os
 import sys
 import time
-# from time import time as robtimer # legacy naming issue
 from math import *
 import PyRoboteq
 
-from lbrsys import robot_id, gyro, accel, mag, mpuData
+from pyquaternion import Quaternion
+
+from lbrsys import robot_id, gyro, accel, mag, mpuData, euler
 from lbrsys.robcom import publisher
 from lbrsys.settings import LOG_DIR
 from lbrsys.settings import X_Convention, Y_Convention, Z_Convention
@@ -43,6 +45,7 @@ from lbrsys.robdrivers.magcal import calc_mag_correction
 # Commands for RIOX not covered by PyRoboteq, as it was designed for a motor controller
 READ_ALL_MEMS = '?ML'
 READ_AHRS_DEGREES = '?EO'
+READ_AHRS_QUATERNION = '?QO'
 
 
 class RIOX(PyRoboteq.RoboteqHandler):
@@ -50,7 +53,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
     zeroAccelResult = accel(0.0,0.0,0.0)
     zeroMagResult = mag(0.0,0.0,0.0)
 
-    def __init__(self, port=RIOX_1216AHRS_Port, hix=-17.025, hiy=4.8):
+    def __init__(self, port=RIOX_1216AHRS_Port, hix=-32.7, hiy=9.15):
         super(RIOX, self).__init__(debug_mode=False, exit_on_interrupt=False)
         self.port = port
 
@@ -127,7 +130,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
             lsb = mems[len(READ_ALL_MEMS):].split(':')
             if len(lsb) != 10:
                 self.read_errors += 1
-                print(f"Malformed mpu read: {mems}", file=sys.stderr)
+                # print(f"Malformed mpu read: {mems}", file=sys.stderr)
                 return self.lastsu
 
             try:
@@ -151,10 +154,11 @@ class RIOX(PyRoboteq.RoboteqHandler):
         else:
             self.read_errors += 1
             if self.read_errors > self.error_limit:
+                pass
                 # print("Resetting MPU due to excessive read errors")
                 # self.reset()
-                print(f"MPU errors:{self.read_errors}, limit: {self.error_limit}", file=sys.stderr)
-                print(f"\t{mems}", file=sys.stderr)
+                # print(f"MPU errors:{self.read_errors}, limit: {self.error_limit}", file=sys.stderr)
+                # print(f"\t{mems}", file=sys.stderr)
 
             mpusu = self.lastsu
 
@@ -216,18 +220,26 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         # This version of the algorithm does not tilt compensate
         heading = -1
-        if m.y == 0:
-            if m.x <= 0:
+        if m.x == 0:
+            if -m.y <= 0:
                 heading = 0.
-            elif m.x > 0:
+            elif -m.y > 0:
                 heading = 180.
         else:
-            rawAngle = atan(m.x / m.y) * 180. / pi
+            rawAngle = atan(-m.y / m.x) * 180. / pi
             # print rawAngle
-            if m.y <= 0:
-                heading = round((270. + rawAngle), 0)
-            else:
-                heading = round((90. + rawAngle), 0)
+            # if m.y <= 0:
+            #     heading = round((270. + rawAngle), 0)
+            # else:
+            #     heading = round((90. + rawAngle), 0)
+            if -m.y >= 0 and m.x >= 0: # Quad 1
+                heading = round((90. - abs(rawAngle)), 0)
+            elif -m.y >= 0 and m.x < 0: # Quad 2
+                heading = round((90. + abs(rawAngle)), 0)
+            elif -m.y < 0 and m.x < 0: # Quad 3
+                heading = round((270. - abs(rawAngle)), 0)
+            else: # Quad 4
+                heading = round((360.- abs(rawAngle)), 0)
 
         # print 'heading: %.0f' % heading
         su = mpuData(g, a, m, round(heading, 2), temperature, round(t, 4))
@@ -338,27 +350,59 @@ class RIOX(PyRoboteq.RoboteqHandler):
     def reset(self):
         return
 
-    def read_ahrs(self):
-        ahrs = self.read_value(READ_AHRS_DEGREES)
-        print(ahrs)
+    def read_ahrs(self, units='Quaternion'):
+
+        if not self.mpu_enabled:
+            return self.mpusu_zero
+
+        if units not in ['Quaternion', 'Euler']:
+            print(f"Invalid units for read_ahrs: {units}")
+            return Quaternion()
+
+        cmd = READ_AHRS_QUATERNION if units == 'Quaternion' else READ_AHRS_DEGREES
+        ahrs = self.read_value(cmd)
+        ahrs = list(map(int, ahrs.split('=')[1].split(':')))
+
+        if units == 'Quaternion':
+            if len(ahrs) == 4:
+                ahrs_out = Quaternion(*list(map(lambda x: round(x/16834., 6), ahrs)))
+            else:
+                print(f"Invalid AHRS for Quaternion: {ahrs}")
+                ahrs_out = Quaternion()
+        else:
+            if len(ahrs) == 3:
+                ahrs_out = euler(*list(map(lambda x: round(x/16834., 4), ahrs)))
+            else:
+                print(f"Invalid AHRS for Euler Angles: {ahrs}")
+                ahrs_out = euler(0., 0., 0.)
+
+        # todo add defaults to mpuData so that this function can return mpuData to
+        #  integrate with the system and/or merge ahrs into mems mpuData
+        return ahrs_out
 
     def close(self):
         return self.ser.close()
 
 
-if __name__ == '__main__':
-
+def test(n=10, units='Quaternion'):
     controller = RIOX()
 
     if controller.connected:
-        loop = 10
+        results = []
+        loop = n
         while loop > 0:
-            r = controller.read()
-            # if r.gyro.x == 0.:
-            print(r)
-
-            # controller.read_ahrs()
-            time.sleep(0.1)
+            r = controller.read_ahrs(units)
+            # print(r)
+            results.append(r)
+            # time.sleep(0.1)
             loop -= 1
 
         controller.close()
+        print(f"got {len(results)} results")
+        return results
+
+
+if __name__ == '__main__':
+    results = test(10, 'Quaternion')
+    if len(results) <= 100:
+        print(results)

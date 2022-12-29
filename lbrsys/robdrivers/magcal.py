@@ -155,4 +155,4 @@ def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
 
 
 if __name__ == '__main__':
-    calc_mag_correction()
+    calc_mag_correction(data_file='/home/robot/lbr/lbrsys/logs/magCalibration.csv')

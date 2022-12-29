@@ -26,12 +26,72 @@ __version__ = "1.0"
 
 
 import os
+from dataclasses import dataclass, field
+from typing import List
+import math
+import numpy as np
 import matplotlib.pyplot as plt
 import statistics
 from datetime import date
 
 from lbrsys.settings import LOG_DIR
 from lbrsys.settings import magCalibrationLogFile
+
+
+@dataclass(order=True)
+class Magcal(object):
+    raw_x : list[float] = field(default_factory=list)
+    raw_y : list[float] = field(default_factory=list)
+
+    x : list[float] = field(default_factory=list)
+    y : list[float] = field(default_factory=list)
+    r_mag : list[float] = field(default_factory=list)
+
+    alpha : float = 0.0
+    beta : float = 0.0
+    major_axis : float = 0.0
+    minor_axis : float = 0.0
+    axis_index : int = -1
+    theta : float = 0.0
+    soft_iron : bool = False
+
+    def iron_corrections(self):
+        make_plot(self.raw_x, self.raw_y, "Raw Data")
+        tolerance = 0.001
+        self.alpha, self.beta, self.x, self.y = correct_hard_iron(self.raw_x, self.raw_y)
+        print(f"alpha: {self.alpha}, beta: {self.beta}")
+        make_plot(self.x, self.y, "Hard Iron")
+
+        self.r_mag = [math.sqrt((x)**2 + (y)**2) for x, y in zip(self.x, self.y)]
+        self.major_axis = max(self.r_mag)
+        self.minor_axis = min(self.r_mag)
+        print(f"Major axis: {self.major_axis}, Minor axis: {self.minor_axis}")
+        assert self.major_axis != 0, f"Unexpected 0 major axis in iron_correction"
+
+        if abs(self.major_axis - self.minor_axis) > tolerance:
+            self.soft_iron = True
+            self.axis_index = self.r_mag.index(self.major_axis)
+            self.theta = math.asin(abs(self.y[self.axis_index])/self.r_mag[self.axis_index])
+
+            rotation = np.array([[math.cos(self.theta), math.sin(self.theta)],
+                                [-math.sin(self.theta), math.cos(self.theta)]])
+
+            rotated = np.matmul(rotation, np.array([self.x, self.y]))
+            make_plot(rotated[0], rotated[1], "Hard Iron and Rotated")
+
+            sigma = self.major_axis / self.minor_axis
+            x_circle = [x/sigma for x in rotated[0]]
+            make_plot(x_circle, rotated[1], "Rotated and Circled")
+
+            tneg = -self.theta
+            re_rotation = np.array([[math.cos(tneg), math.sin(tneg)],
+                                    [-math.sin(tneg), math.cos(tneg)]])
+
+            orig_rotation = np.matmul(re_rotation, np.array([x_circle, rotated[1]]))
+            make_plot(orig_rotation[0], orig_rotation[1], "Final Result")
+        else:
+            print("Soft iron correction not required")
+
 
 def get_records(path):
     with open(path, 'r') as f:
@@ -77,7 +137,11 @@ def remove_outliers(x, y):
         del y[i]
         deleted.append(i)
 
-    print(f"Indexes deleted: {str(deleted)}")
+    if len(deleted) != 0:
+        print(f"Indexes deleted: {str(deleted)} as outliers.")
+    else:
+        print("No outliers detected.")
+
     return deleted
 
 
@@ -112,7 +176,7 @@ def correct_hard_iron(x, y):
 def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
               xlabel='x uT', ylabel='y uT'):
 
-    plt.style.use('seaborn-whitegrid')
+    plt.style.use('seaborn-v0_8-whitegrid')
     # xi = list(range(len(x)))
     xlim_min = min([min(x)*2, abs(max(x))*2])
     xlim_max = max([min(x)*2, abs(max(x))*2])
@@ -121,8 +185,10 @@ def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
 
     plt.ylim(ylim_min, ylim_max)
     plt.xlim(xlim_min, xlim_max)
+    fig1, ax = plt.subplots()
+    ax.set_box_aspect(1)
 
-    plt.figure(figsize=(8, 6))
+    # plt.figure(figsize=(8, 6))
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     # plt.xticks(xi, x)
@@ -130,8 +196,8 @@ def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
     #plt.legend()
     plt.plot(x, y, '.', color='blue')
     # fig = plt.gcf()
-    plt.savefig(image_file)
-    # plt.show()
+    # plt.savefig(image_file)
+    plt.show()
 
 
 def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
@@ -155,4 +221,7 @@ def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
 
 
 if __name__ == '__main__':
-    calc_mag_correction(data_file='/home/robot/lbr/lbrsys/logs/magCalibration.csv')
+    # calc_mag_correction(data_file='/home/robot/lbr/logs/magCalibration.csv')
+    x, y = get_records('/home/robot/lbr/logs/magCalibration.csv')
+    mc = Magcal(x, y)
+    mc.iron_corrections()

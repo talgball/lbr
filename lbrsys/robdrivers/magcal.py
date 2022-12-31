@@ -76,21 +76,30 @@ class Magcal(object):
             rotation = np.array([[math.cos(self.theta), math.sin(self.theta)],
                                 [-math.sin(self.theta), math.cos(self.theta)]])
 
-            rotated = np.matmul(rotation, np.array([self.x, self.y]))
+            # rotated = np.matmul(rotation, np.array([self.x, self.y]))
+            rotated = rotation @ np.array([self.x, self.y])
             make_plot(rotated[0], rotated[1], "Hard Iron and Rotated")
 
-            sigma = self.major_axis / self.minor_axis
-            x_circle = [x/sigma for x in rotated[0]]
+            sigma = self.minor_axis / self.major_axis
+            # x_circle = [x*sigma for x in rotated[0]]
+            x_circle = sigma * rotated[0]
             make_plot(x_circle, rotated[1], "Rotated and Circled")
 
-            tneg = -self.theta
+            tneg = self.theta
             re_rotation = np.array([[math.cos(tneg), math.sin(tneg)],
                                     [-math.sin(tneg), math.cos(tneg)]])
 
-            orig_rotation = np.matmul(re_rotation, np.array([x_circle, rotated[1]]))
+            # orig_rotation = np.matmul(re_rotation, np.array([x_circle, rotated[1]]))
+            orig_rotation = re_rotation @ [x_circle, rotated[1]]
+
             make_plot(orig_rotation[0], orig_rotation[1], "Final Result")
+
+            self.final_corrections = rotation @ np.array([[sigma, 1], [sigma, 1]]) @ re_rotation
+
+            return self.final_corrections
+
         else:
-            print("Soft iron correction not required")
+            print("Soft iron correction not required") 
 
 
 def get_records(path):
@@ -177,6 +186,8 @@ def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
               xlabel='x uT', ylabel='y uT'):
 
     plt.style.use('seaborn-v0_8-whitegrid')
+    plt.figure(figsize=(8, 6))
+
     # xi = list(range(len(x)))
     xlim_min = min([min(x)*2, abs(max(x))*2])
     xlim_max = max([min(x)*2, abs(max(x))*2])
@@ -188,7 +199,6 @@ def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
     fig1, ax = plt.subplots()
     ax.set_box_aspect(1)
 
-    # plt.figure(figsize=(8, 6))
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     # plt.xticks(xi, x)
@@ -224,4 +234,4 @@ if __name__ == '__main__':
     # calc_mag_correction(data_file='/home/robot/lbr/logs/magCalibration.csv')
     x, y = get_records('/home/robot/lbr/logs/magCalibration.csv')
     mc = Magcal(x, y)
-    mc.iron_corrections()
+    print(mc.iron_corrections())

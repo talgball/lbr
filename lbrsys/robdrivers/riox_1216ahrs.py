@@ -28,6 +28,7 @@ import os
 import sys
 import time
 from math import *
+import numpy as np
 import PyRoboteq
 
 from pyquaternion import Quaternion
@@ -59,6 +60,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         self.hix = hix
         self.hiy = hiy
+        self.corrections = np.array([[0.12815776, 1.5198374], [0.04730655, 0.5610138]]) # todo replace hard coding with lookup
         self.alpha_setting = None
         self.beta_setting = None
         self.mpu_enabled = True
@@ -261,8 +263,15 @@ class RIOX(PyRoboteq.RoboteqHandler):
         """
         Make hard and soft iron adjustments here.  As of 2019-01-28,
         lbr2a required hard iron adjustments but not soft iron.
+
+        lbr6 needed both hard and soft iron adjustments as of 2022-12-30
         """
         hadj = [h[0]-self.hix, h[1]-self.hiy, h[2]]
+
+        if self.corrections is not None:
+            hadj_soft = self.corrections @ np.array([[hadj[0]], [hadj[1]]])
+            hadj = list([hadj_soft[0][0], hadj_soft[1][0], h[2]])
+
         return hadj
 
     def calibrateMag(self, samples=500, source=None):
@@ -403,6 +412,13 @@ def test(n=10, units='Quaternion'):
 
 
 if __name__ == '__main__':
+    """
     results = test(10, 'Quaternion')
     if len(results) <= 100:
         print(results)
+    """
+    controller = RIOX()
+    for i in range(10):
+        print(controller.read_mems())
+
+    controller.close()

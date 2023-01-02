@@ -29,7 +29,9 @@ import os
 from dataclasses import dataclass, field
 from typing import List
 import math
+from threading import Thread
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import statistics
 from datetime import date
@@ -183,7 +185,7 @@ def correct_hard_iron(x, y):
 
 
 def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
-              xlabel='x uT', ylabel='y uT'):
+              xlabel='x uT', ylabel='y uT', save=True):
 
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.figure(figsize=(8, 6))
@@ -196,8 +198,8 @@ def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
 
     plt.ylim(ylim_min, ylim_max)
     plt.xlim(xlim_min, xlim_max)
-    fig1, ax = plt.subplots()
-    ax.set_box_aspect(1)
+    # fig1, ax = plt.subplots()
+    # ax.set_box_aspect(1)
 
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -205,9 +207,18 @@ def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
     plt.title(title)
     #plt.legend()
     plt.plot(x, y, '.', color='blue')
-    # fig = plt.gcf()
-    # plt.savefig(image_file)
+
+    if save:
+        # fig = plt.gcf()
+        plt.savefig(image_file)
+
+    # plt.ioff()
     plt.show()
+
+    # This fails and generates:
+    #   "UserWarning: Starting a Matplotlib GUI outside of the main thread will likely fail.
+    # plot_thread = Thread(target=plt.show, daemon=True)
+    # plot_thread.start()
 
 
 def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
@@ -231,7 +242,9 @@ def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
 
 
 if __name__ == '__main__':
+    # matplotlib.use('Qt5Agg')
+    # matplotlib.use('Agg')
     # calc_mag_correction(data_file='/home/robot/lbr/logs/magCalibration.csv')
-    x, y = get_records('/home/robot/lbr/logs/magCalibration.csv')
+    x, y = get_records('/home/robot/lbr/logs/mag_working/magCalibration.csv')
     mc = Magcal(x, y)
     print(mc.iron_corrections())

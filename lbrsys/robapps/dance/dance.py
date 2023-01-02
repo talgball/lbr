@@ -211,6 +211,6 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         da  = DanceApp(robot, robot_url, user, token, dance(sys.argv[1]))
     else:
-        da = DanceApp(robot, robot_url, user, token, dance('beg'))
+        da = DanceApp(robot, robot_url, user, token, dance('aobtd'))
 
     # da = DanceApp(robot, robot_url, user, token, dance('aobtd'))

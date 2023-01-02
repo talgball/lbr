@@ -41,7 +41,7 @@ from lbrsys.settings import magCalibrationLogFile
 from lbrsys.settings import RIOX_1216AHRS_Port
 
 from lbrsys.robdrivers.calibration import Calibration, CalibrationSetting
-from lbrsys.robdrivers.magcal import calc_mag_correction
+from lbrsys.robdrivers.magcal import calc_mag_correction, make_plot
 
 # Commands for RIOX not covered by PyRoboteq, as it was designed for a motor controller
 READ_ALL_MEMS = '?ML'
@@ -223,22 +223,22 @@ class RIOX(PyRoboteq.RoboteqHandler):
         # This version of the algorithm does not tilt compensate
         heading = -1
         if m.x == 0:
-            if -m.y <= 0:
+            if m.y <= 0:
                 heading = 0.
-            elif -m.y > 0:
+            elif m.y > 0:
                 heading = 180.
         else:
-            rawAngle = atan(-m.y / m.x) * 180. / pi
+            rawAngle = atan(m.y / m.x) * 180. / pi
             # print rawAngle
             # if m.y <= 0:
             #     heading = round((270. + rawAngle), 0)
             # else:
             #     heading = round((90. + rawAngle), 0)
-            if -m.y >= 0 and m.x >= 0: # Quad 1
+            if m.y >= 0 and m.x >= 0: # Quad 1
                 heading = round((90. - abs(rawAngle)), 0)
-            elif -m.y >= 0 and m.x < 0: # Quad 2
+            elif m.y >= 0 and m.x < 0: # Quad 2
                 heading = round((90. + abs(rawAngle)), 0)
-            elif -m.y < 0 and m.x < 0: # Quad 3
+            elif m.y < 0 and m.x < 0: # Quad 3
                 heading = round((270. - abs(rawAngle)), 0)
             else: # Quad 4
                 heading = round((360.- abs(rawAngle)), 0)
@@ -292,9 +292,19 @@ class RIOX(PyRoboteq.RoboteqHandler):
         x = None
         y = None
 
-        if source is None or source == '-':
-            self.hix = 0.
-            self.hiy = 0.
+        do_save = True
+        do_show = False
+
+        if source is None or source.startswith('-') :
+            if source == '-c':
+                # do_save = False
+                do_save = True
+                do_show = True
+            else:
+                self.hix = 0.
+                self.hiy = 0.
+                self.corrections = None
+
             print("Collecting magnetometer calibration data.  Robot should be spinning about its z axis.")
             for r in range(samples):
                 cal_data.append(self.read())
@@ -305,14 +315,18 @@ class RIOX(PyRoboteq.RoboteqHandler):
             x = [r.mag.x for r in cal_data]
             y = [r.mag.y for r in cal_data]
 
-            try:
-                self.save_cal_data(cal_data)
-            except Exception as e:
-                print(f"Error saving magnetometer samples:\n{str(e)}")
-                return
+            if do_save:
+                try:
+                    self.save_cal_data(cal_data)
+                except Exception as e:
+                    print(f"Error saving magnetometer samples:\n{str(e)}")
+                    return
+
+            if do_show:
+                make_plot(x, y, "Corrected Data", save=False)
 
         try:
-            if source is not None and source != '-':
+            if source is not None and not source.startswith('-'):
                 source_path = os.path.join(LOG_DIR, source)
             else:
                 source_path = None

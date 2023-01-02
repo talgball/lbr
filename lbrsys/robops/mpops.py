@@ -164,6 +164,7 @@ class MPservice(object):
         if type(task) is calibrateMagnetometer:
             try:
                 self.mpu.calibrateMag(task.samples, task.source)
+                # self.broadcastQ.put(power(0., 0))  # redundant with finally.
             except Exception as e:
                 print(f"Error calibrating magnetometer\n{str(e)}")
             finally:

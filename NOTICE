@@ -35,3 +35,12 @@ Copyright 2013-2017 Dave Jones, Distributed under BSD 3 License, included here f
     CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
     ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
     POSSIBILITY OF SUCH DAMAGE.
+
+
+For included derivative work in module ellipse_fit.py, used in motion processing calibration, magcal.py:
+    ellipse_fit is from:
+
+    https://scipython.com/blog/direct-linear-least-squares-fitting-of-an-ellipse/
+
+    By Christian Hill, as supplemental material for his book,
+        "Learning Scientific Programming with Python"

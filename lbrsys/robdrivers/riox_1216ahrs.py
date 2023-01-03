@@ -54,13 +54,15 @@ class RIOX(PyRoboteq.RoboteqHandler):
     zeroAccelResult = accel(0.0,0.0,0.0)
     zeroMagResult = mag(0.0,0.0,0.0)
 
-    def __init__(self, port=RIOX_1216AHRS_Port, hix=-32.7, hiy=9.15):
+    def __init__(self, port=RIOX_1216AHRS_Port, hix=-34.35, hiy=8.85):
         super(RIOX, self).__init__(debug_mode=False, exit_on_interrupt=False)
         self.port = port
 
         self.hix = hix
         self.hiy = hiy
-        self.corrections = np.array([[0.12815776, 1.5198374], [0.04730655, 0.5610138]]) # todo replace hard coding with lookup
+        self.corrections = np.array([[0.60928257, 0.13501856], [0.13501856, 0.95334221]])  # todo replace with lookup
+        self.radius = 32.46031859991263  # Set to None to enable rotation method
+        # self.radius = None
         self.alpha_setting = None
         self.beta_setting = None
         self.mpu_enabled = True
@@ -222,28 +224,29 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         # This version of the algorithm does not tilt compensate
         heading = -1
-        if m.x == 0:
-            if m.y <= 0:
-                heading = 0.
-            elif m.y > 0:
-                heading = 180.
-        else:
-            rawAngle = atan(m.y / m.x) * 180. / pi
-            # print rawAngle
-            # if m.y <= 0:
-            #     heading = round((270. + rawAngle), 0)
-            # else:
-            #     heading = round((90. + rawAngle), 0)
-            if m.y >= 0 and m.x >= 0: # Quad 1
-                heading = round((90. - abs(rawAngle)), 0)
-            elif m.y >= 0 and m.x < 0: # Quad 2
-                heading = round((90. + abs(rawAngle)), 0)
-            elif m.y < 0 and m.x < 0: # Quad 3
-                heading = round((270. - abs(rawAngle)), 0)
-            else: # Quad 4
-                heading = round((360.- abs(rawAngle)), 0)
+        # x = m.x
+        # y = -m.y
+        # Align with the robot conventions and the sensor mounting direction
+        x = -m.y
+        y = m.x
 
-        # print 'heading: %.0f' % heading
+        if x == 0:
+            if y < 0.:
+                heading = 180.
+            elif y >= 0:
+                heading = 0.
+        else:
+            rawAngle = atan(y / x) * 180. / pi
+
+            if y >= 0 and x >= 0: # Quad 1
+                heading = round(rawAngle, 0)
+            elif y >= 0 and x < 0: # Quad 2
+                heading = round((180. - abs(rawAngle)), 0)
+            elif y < 0 and x < 0: # Quad 3
+                heading = round((180. + abs(rawAngle)), 0)
+            else: # Quad 4
+                heading = round((360. - abs(rawAngle)), 0)
+
         su = mpuData(g, a, m, round(heading, 2), temperature, round(t, 4))
 
         deltat = time.time() - t0
@@ -265,10 +268,27 @@ class RIOX(PyRoboteq.RoboteqHandler):
         lbr2a required hard iron adjustments but not soft iron.
 
         lbr6 needed both hard and soft iron adjustments as of 2022-12-30
+
+        Two methods of soft iron correction are provided:
+        If radius is available, move the given point onto a circle with the given
+        radius, preserving the angle of a ray passing through the origin and the point.
+
+        If radius is not available, use the rotation matrix corrections.
+
+        Otherwise, adjust hard iron only.
+
         """
+
+        # Get the hard iron adjustment out of the way
         hadj = [h[0]-self.hix, h[1]-self.hiy, h[2]]
 
-        if self.corrections is not None:
+        if self.radius is not None:
+            a = atan2(hadj[1], hadj[0])
+            xc = self.radius * cos(a)
+            yc = self.radius * sin(a)
+            hadj = [xc, yc, h[2]]
+
+        elif self.corrections is not None:
             hadj_soft = self.corrections @ np.array([[hadj[0]], [hadj[1]]])
             hadj = list([hadj_soft[0][0], hadj_soft[1][0], h[2]])
 
@@ -276,14 +296,16 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
     def calibrateMag(self, samples=500, source=None):
         """
-        Execute calibration procedure to calculate the hard (and eventually soft)
+        Execute calibration procedure to calculate the hard and eventually soft
         iron adjustments.  Note that the robot must be in a safe location for spinning
         around it's Z axis in order to collect the data.
         :param: samples - the number of magnetometer readings to collect
-        :param: source - Collect new samples if None, otherwise read samples from path given by source.
+        :param: source - Collect new samples if None or '-', otherwise read samples from path given by source.
+            If '-c' then collect and view samples via existing corrections.
         :return:
-        todo - simplify using numpy arrays
         """
+        # todo cleanup and integrate saving functions now that soft iron is implemented
+
         if samples > 1000:
             print(f"Samples limited to 1000 instead of {samples}")
             samples = 1000
@@ -292,6 +314,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
         x = None
         y = None
 
+        # todo externalize logic to control these flags
         do_save = True
         do_show = False
 

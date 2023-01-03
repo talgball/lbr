@@ -4,6 +4,9 @@ magcal.py - Module to process calibration data for InvenSense MPU9150 and calcul
     Currently, the "hard iron" adjustments of alpha and beta are supported, which are
     the offsets that are applied to new readings to center them on the origin and
     correct for any fixed magnetic field influences in the robot.
+
+    ACTIVE DEVELOPMENT is underway in this module to implement soft iron corrections.
+        Might not be in a working state for any individual commit.
 """
 
 __author__ = "Tal G. Ball"
@@ -39,6 +42,7 @@ from datetime import date
 from lbrsys.settings import LOG_DIR
 from lbrsys.settings import magCalibrationLogFile
 
+from lbrsys.robdrivers.ellipse_fit import fit_ellipse, get_ellipse_pts, cart_to_pol
 
 @dataclass(order=True)
 class Magcal(object):
@@ -60,6 +64,7 @@ class Magcal(object):
     def iron_corrections(self):
         make_plot(self.raw_x, self.raw_y, "Raw Data")
         tolerance = 0.001
+        final_corrections = None
         self.alpha, self.beta, self.x, self.y = correct_hard_iron(self.raw_x, self.raw_y)
         print(f"alpha: {self.alpha}, beta: {self.beta}")
         make_plot(self.x, self.y, "Hard Iron")
@@ -72,36 +77,83 @@ class Magcal(object):
 
         if abs(self.major_axis - self.minor_axis) > tolerance:
             self.soft_iron = True
-            self.axis_index = self.r_mag.index(self.major_axis)
-            self.theta = math.asin(abs(self.y[self.axis_index])/self.r_mag[self.axis_index])
 
-            rotation = np.array([[math.cos(self.theta), math.sin(self.theta)],
-                                [-math.sin(self.theta), math.cos(self.theta)]])
-
-            # rotated = np.matmul(rotation, np.array([self.x, self.y]))
-            rotated = rotation @ np.array([self.x, self.y])
-            make_plot(rotated[0], rotated[1], "Hard Iron and Rotated")
-
-            sigma = self.minor_axis / self.major_axis
-            # x_circle = [x*sigma for x in rotated[0]]
-            x_circle = sigma * rotated[0]
-            make_plot(x_circle, rotated[1], "Rotated and Circled")
-
-            tneg = self.theta
-            re_rotation = np.array([[math.cos(tneg), math.sin(tneg)],
-                                    [-math.sin(tneg), math.cos(tneg)]])
-
-            # orig_rotation = np.matmul(re_rotation, np.array([x_circle, rotated[1]]))
-            orig_rotation = re_rotation @ [x_circle, rotated[1]]
-
-            make_plot(orig_rotation[0], orig_rotation[1], "Final Result")
-
-            self.final_corrections = rotation @ np.array([[sigma, 1], [sigma, 1]]) @ re_rotation
-
-            return self.final_corrections
+            # final_corrections = self.soft_iron_by_rotation()
+            final_corrections = self.soft_iron_by_ellipse()
 
         else:
             print("Soft iron correction not required") 
+
+        return self.alpha, self.beta, final_corrections
+
+    def soft_iron_by_ellipse(self):
+        """Use alternate method for soft iron correction consisting of fitting an ellipse
+        to the calibration data and then using a circle based on the minor axis to correct the
+        data.  Assumes Hard Iron correction has already been performed.
+        """
+
+        plt.plot(self.x, self.y, '.', color='blue')
+
+        xa = np.array(self.x)
+        ya = np.array(self.y)
+
+        coeffs = fit_ellipse(xa, ya)
+
+        print('Fitted ellipse parameters:')
+        print('a, b, c, d, e, f =', coeffs)
+        x0, y0, ap, bp, e, phi = cart_to_pol(coeffs)
+        radius = bp
+        print('x0, y0, ap, bp, e, phi = ', x0, y0, ap, bp, e, phi)
+
+        # add the fitted ellipse onto the plot
+        xp, yp = get_ellipse_pts((x0, y0, ap, bp, e, phi))
+        plt.plot(xp, yp, '+', color='red')
+
+        # use the get_ellipse_pts function to draw circle using minor ellipse axis
+        xc, yc = get_ellipse_pts((x0, y0, bp, bp, e, phi))
+        plt.plot(xc, yc, '.', color='black')
+
+        # copy the data points onto the circle
+        x_onc = []
+        y_onc = []
+        for xi, yi in zip(x, y):
+            a = math.atan2(yi, xi)
+            x_onc.append(bp * np.cos(a))
+            y_onc.append(bp * np.sin(a))
+
+        plt.plot(x_onc, y_onc, '+', color='green')
+
+        plt.show()
+
+        return radius
+
+    def soft_iron_by_rotation(self):
+        self.axis_index = self.r_mag.index(self.major_axis)
+        self.theta = math.asin(abs(self.y[self.axis_index]) / self.r_mag[self.axis_index])
+        print(f"theta: {self.theta}")
+
+        rotation = np.array([[math.cos(self.theta), math.sin(self.theta)],
+                             [-math.sin(self.theta), math.cos(self.theta)]])
+
+        rotated = rotation @ np.array([self.x, self.y])
+        make_plot(rotated[0], rotated[1], "Hard Iron Corrected and Rotated for x Alignment")
+
+        sigma = self.minor_axis / self.major_axis
+        print(f"sigma: {sigma}")
+        x_circle = sigma * rotated[0]
+        make_plot(x_circle, rotated[1], "Rotated and Circled")
+
+        tneg = -self.theta
+        re_rotation = np.array([[math.cos(tneg), math.sin(tneg)],
+                                [-math.sin(tneg), math.cos(tneg)]])
+
+        orig_rotation = re_rotation @ np.array([x_circle, rotated[1]])
+
+        make_plot(orig_rotation[0], orig_rotation[1], "Final Result")
+
+        self.final_corrections = rotation @ np.array([[sigma, 0.], [0., 1.]]) @ re_rotation
+
+        return self.final_corrections
 
 
 def get_records(path):
@@ -188,7 +240,7 @@ def make_plot(x, y, title="Sensor Data", image_file="sensor.png",
               xlabel='x uT', ylabel='y uT', save=True):
 
     plt.style.use('seaborn-v0_8-whitegrid')
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(8, 8))
 
     # xi = list(range(len(x)))
     xlim_min = min([min(x)*2, abs(max(x))*2])
@@ -245,6 +297,28 @@ if __name__ == '__main__':
     # matplotlib.use('Qt5Agg')
     # matplotlib.use('Agg')
     # calc_mag_correction(data_file='/home/robot/lbr/logs/magCalibration.csv')
-    x, y = get_records('/home/robot/lbr/logs/mag_working/magCalibration.csv')
+    # x, y = get_records('/home/robot/lbr/logs/mag_working/magCalibration.csv')
+    x, y = get_records('/home/robot/lbr/logs/magCalibration-2023-01-01-raw.csv')
+
     mc = Magcal(x, y)
     print(mc.iron_corrections())
+
+    """
+    hix = -34.35
+    hiy = 8.85
+    corrections = np.array([[0.39592896, 0.48238524], [-0.48238524, 0.83330418]])
+
+    xc = []
+    yc = []
+
+    for xi, yi in zip(x, y):
+        hadj = [xi - hix, yi - hiy, -25.]
+        hadj_soft = corrections @ np.array([[hadj[0]], [hadj[1]]])
+        hadj = list([hadj_soft[0][0], hadj_soft[1][0], hadj[2]])
+        xc.append(hadj[0])
+        yc.append(hadj[1])
+        
+
+
+    make_plot(xc, yc, "Corrected - directly")
+    """

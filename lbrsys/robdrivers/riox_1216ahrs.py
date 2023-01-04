@@ -296,7 +296,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
     def calibrateMag(self, samples=500, source=None):
         """
-        Execute calibration procedure to calculate the hard and eventually soft
+        Execute calibration procedure to calculate the hard and soft
         iron adjustments.  Note that the robot must be in a safe location for spinning
         around it's Z axis in order to collect the data.
         :param: samples - the number of magnetometer readings to collect

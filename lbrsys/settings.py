@@ -85,6 +85,8 @@ LOG_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.isdir(LOG_DIR):
     os.mkdir(LOG_DIR)
 
+MAG_CALIBRATION_DIR = os.path.join(LOG_DIR, 'mag_calibration')
+
 robLogFile     = os.path.join(LOG_DIR, 'robot.log')
 opsLogFile     = os.path.join(LOG_DIR, 'ops.log')
 mpLogFile      = os.path.join(LOG_DIR, 'mpu.log')
@@ -95,4 +97,6 @@ speechLogFile  = os.path.join(LOG_DIR, 'speech.log')
 iotLogFile     = os.path.join(LOG_DIR, 'iot.log')
 rangeobserverLogFile = os.path.join(LOG_DIR, 'rangeobserver.log')
 headingobserverLogFile = os.path.join(LOG_DIR, 'headingobserver.log')
-magCalibrationLogFile = os.path.join(LOG_DIR, 'magCalibration.csv')
+
+magCalibrationLogFile = os.path.join(MAG_CALIBRATION_DIR,
+                                     "{today}-mag-0-raw-calibration-data.csv")

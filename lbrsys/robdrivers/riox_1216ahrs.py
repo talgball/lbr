@@ -378,13 +378,11 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         return
 
-
     def save_cal_data(self, cal_data):
         with open(magCalibrationLogFile, 'w') as f:
             print("X,Y,Z,Heading", file=f)
             for r in cal_data:
                 print(f"{r.mag.x},{r.mag.y},{r.mag.z},{r.heading}", file=f)
-
 
     def save_corrected(self, x, y):
         with open(magCalibrationLogFile+'-corrected', 'w') as f:

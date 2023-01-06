@@ -34,7 +34,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 sys.path.append(os.path.dirname(BASE_DIR))
 
-from robcom import robhttp2
+from lbrsys.robcom import robhttp2
 
 from fsm import StateMachine
 import telemetry
@@ -314,14 +314,16 @@ if __name__ == '__main__':
         print(("Error setting up environment:\n%s" %
               str(e)))
 
-    stateFileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                        'statesd', 'autodock.states')
+    # stateFileName = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+    #                     'statesd', 'autodock.states')
+    stateFileName = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'statesd', 'sensor_testing.csv')
 
     if len(sys.argv) == 2:
         stateFileName = sys.argv[1]
         if stateFileName[0] != '/':
             stateFileName = os.path.join(os.path.dirname(
-                               os.path.abspath(__file__)), 
+                               os.path.abspath(__file__)),
                                'statesd', stateFileName)
     elif not robot: # todo standardize arg parsing
         print('Usage: robfsm.py <statefile>')

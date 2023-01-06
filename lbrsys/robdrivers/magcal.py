@@ -41,6 +41,25 @@ from lbrsys.settings import MAG_CALIBRATION_DIR, magCalibrationLogFile
 
 from lbrsys.robdrivers.ellipse_fit import fit_ellipse, get_ellipse_pts, cart_to_pol
 
+@dataclass
+class Ellipse_Model(object):
+    """Hold and manage the coefficients and polar parameters for ellipse
+        fitted from calibration data.
+        Ellipse described by:  ax^2 + bxy + cy^2 + dx + ey + f = 0
+    """
+    a: float = 0.
+    b: float = 0.
+    c: float = 0.
+    d: float = 0.
+    e: float = 0.
+    f: float = 0.
+    x0: float = 0.
+    y0: float = 0.
+    ap: float = 0.
+    bp: float = 0.
+    ep: float = 0.
+    phi: float = 0.
+
 
 @dataclass(order=True)
 class Magcal(object):
@@ -60,10 +79,12 @@ class Magcal(object):
     axis_index: int = field(init=False, default=-1)
     theta: float = field(init=False, default=0.)
     soft_iron: bool = field(init=False, default=False)
-    final_corrections: np.array = field(init=False, default=None)
     plot_mgmt: OrderedDict = field(init=False, default_factory=OrderedDict)
+    final_corrections: np.array = field(init=False, default=None)
+    ellipse: Ellipse_Model = field(init=False, default=None)
 
     def __post_init__(self):
+        # Configure Plots
         # matplotlib.use('Qt5Agg')
         # matplotlib.use('Agg')
         plt.style.use('seaborn-v0_8-whitegrid')
@@ -82,6 +103,7 @@ class Magcal(object):
         self.plot_mgmt['corrected_1'] = {'fig': 3, 'title': 'Corrections 1'}
         self.plot_mgmt['corrected_2'] = {'fig': 4, 'title': 'Corrections 2'}
         self.plot_mgmt['composite'] = {'fig': 5, 'title': 'Composite'}
+        self.plot_mgmt['backtest'] = {'fig': 6, 'title': 'Backtest'}
 
         keys = list(self.plot_mgmt.keys())
         for n in range(len(keys)):
@@ -95,6 +117,7 @@ class Magcal(object):
             ax.axis('equal')
 
         plt.figure(1)
+
 
     def plot(self, x=None, y=None, fmt='.', *args, fig_name=None, **kwargs):
         fig_title = 'Calibration Analysis'  # default
@@ -143,8 +166,7 @@ class Magcal(object):
     def close_figures(self):
         plt.close('all')
 
-    def iron_corrections(self):
-        # make_plot(self.raw_x, self.raw_y, "Raw Data")
+    def iron_corrections_orig_algorithm(self):
         self.plot(self.raw_x, self.raw_y, '.', fig_name='raw', color='cyan')
 
         tolerance = 0.001
@@ -152,7 +174,6 @@ class Magcal(object):
 
         self.alpha, self.beta, self.x, self.y = correct_hard_iron(self.raw_x, self.raw_y)
         print(f"alpha: {self.alpha}, beta: {self.beta}")
-        # make_plot(self.x, self.y, "Hard Iron")
 
         corrected_ax = self.plot(self.x, self.y, '.', fig_name='hard_iron', color='blue')
 
@@ -173,19 +194,29 @@ class Magcal(object):
             self.close_figures()
 
         else:
-            print("Soft iron correction not required") 
+            print("Soft iron correction not required")
 
         self.final_corrections = final_corrections
 
         return self.alpha, self.beta, self.final_corrections
 
-    def soft_iron_by_ellipse(self):
-        """Use alternate method for soft iron correction consisting of fitting an ellipse
-        to the calibration data and then using a circle based on the minor axis to correct the
-        data.  Assumes Hard Iron correction has already been performed.
-        """
+    def iron_corrections(self):
+        self.plot(self.raw_x, self.raw_y, '.', fig_name='raw', color='cyan')
 
-        ax = self.plot(self.x, self.y, fig_name='composite', fmt='.', color='blue')
+        tolerance = 0.001
+        self.final_corrections = None
+
+        self.alpha, self.beta, self.x, self.y = correct_hard_iron(self.raw_x, self.raw_y)
+        print(f"alpha: {self.alpha}, beta: {self.beta}")
+
+        ax = self.plot(self.x, self.y, '.', fig_name='hard_iron', color='blue')
+        
+        # This method of determining axes is replaced by a best-fitting ellipse approach
+        # self.r_mag = [math.sqrt((x)**2 + (y)**2) for x, y in zip(self.x, self.y)]
+        # self.major_axis = max(self.r_mag)
+        # self.minor_axis = min(self.r_mag)
+        # print(f"Major axis: {self.major_axis}, Minor axis: {self.minor_axis}")
+        # assert self.major_axis != 0, f"Unexpected 0 major axis in iron_correction"
 
         xa = np.array(self.x)
         ya = np.array(self.y)
@@ -198,58 +229,97 @@ class Magcal(object):
         radius = bp
         print('x0, y0, ap, bp, e, phi = ', x0, y0, ap, bp, e, phi)
 
+        self.ellipse = Ellipse_Model(*coeffs, x0, y0, ap, bp, e, phi)
+
         # add the fitted ellipse onto the plot
         xp, yp = get_ellipse_pts((x0, y0, ap, bp, e, phi))
-        # plt.plot(xp, yp, '+-', color='red')
         ax.plot(xp, yp, '+-', color='red')
+        
+        self.major_axis = self.ellipse.ap
+        self.minor_axis = self.ellipse.bp
 
-        # use the get_ellipse_pts function to draw circle using minor ellipse axis
-        xc, yc = get_ellipse_pts((x0, y0, bp, bp, e, phi))
-        # plt.plot(xc, yc, '-', color='black')
-        ax.plot(xc, yc, '-', color='black')
+        if abs(self.major_axis - self.minor_axis) > tolerance:
+            self.soft_iron = True
 
-        # copy the data points onto the circle
-        x_onc = []
-        y_onc = []
-        for xi, yi in zip(x, y):
-            a = math.atan2(yi, xi)
-            x_onc.append(bp * np.cos(a))
-            y_onc.append(bp * np.sin(a))
+            # rotate the ellipse to align with x axis
+            rotation = np.array([[math.cos(phi), math.sin(phi)],
+                                 [-math.sin(phi), math.cos(phi)]])
 
-        # plt.plot(x_onc, y_onc, '+', color='green')
-        ax.plot(x_onc, y_onc, '+', color='green')
+            rotated = rotation @ np.array([self.x, self.y])
 
-        return radius
+            ax = self.plot(rotated[0], rotated[1], '.', fig_name='composite', color='cyan')
+            # plot the unrotated date and fitted ellipse for reference
+            ax.plot(self.x, self.y, '.',  color='blue')
+            ax.plot(xp, yp, '+-', color='red')
 
-    def soft_iron_by_rotation(self):
-        self.axis_index = self.r_mag.index(self.major_axis)
-        self.theta = math.asin(abs(self.y[self.axis_index]) / self.r_mag[self.axis_index])
-        print(f"theta: {self.theta}")
+            # compress the ellipse into a circle
+            sigma = self.minor_axis / self.major_axis
+            print(f"sigma: {sigma}")
+            x_circle = sigma * rotated[0]
+            ax.plot(x_circle, rotated[1], '.', color='green')
 
-        rotation = np.array([[math.cos(self.theta), math.sin(self.theta)],
-                             [-math.sin(self.theta), math.cos(self.theta)]])
+            # rotate the compressed ellipse back into its original angle
+            phi_neg = -phi
+            re_rotation = np.array([[math.cos(phi_neg), math.sin(phi_neg)],
+                                    [-math.sin(phi_neg), math.cos(phi_neg)]])
 
-        rotated = rotation @ np.array([self.x, self.y])
+            orig_rotation = re_rotation @ np.array([x_circle, rotated[1]])
+            self.plot(orig_rotation[0], orig_rotation[1], '+', fig_name='corrected_2', color='green')
 
-        self.plot(rotated[0], rotated[1], '.', fig_name='hard_iron', color='blue')
-        sigma = self.minor_axis / self.major_axis
-        print(f"sigma: {sigma}")
-        x_circle = sigma * rotated[0]
+            # calculate composite transformation matrix
+            squish = np.array([[sigma, 0.], [0., 1.]])
+            self.final_corrections = re_rotation @ squish @ rotation  # MUST be last first
 
-        self.plot(x_circle, rotated[1], '.', fig_name="corrected_1", color='blue')
+            if self.backtest():
+                print("Calibration model verified.\n")
+            else:
+                print("Calibration model failed.\n")
 
-        tneg = -self.theta
-        re_rotation = np.array([[math.cos(tneg), math.sin(tneg)],
-                                [-math.sin(tneg), math.cos(tneg)]])
+            self.save()
+            self.show()
+            self.close_figures()
+        else:
+            print("Soft iron correction not required") 
 
-        orig_rotation = re_rotation @ np.array([x_circle, rotated[1]])
+        return self.alpha, self.beta, self.final_corrections
 
+    def backtest(self):
+        print("\nBacktesting the raw data with the final corrections.")
 
-        self.plot(orig_rotation[0], orig_rotation[1], '+', fig_name='corrected_2', color='green')
+        x_bt = np.array([x-self.alpha for x in self.raw_x])
+        y_bt = np.array([y-self.beta for y in self.raw_y])
 
-        self.final_corrections = rotation @ np.array([[sigma, 0.], [0., 1.]]) @ re_rotation
+        bt_corrected = self.final_corrections @ np.array([x_bt, y_bt])
 
-        return self.final_corrections
+        self.plot(bt_corrected[0], bt_corrected[1], '.', fig_name='backtest')
+
+        print("\tChecking circle for backtested results by fitting ellipse.")
+        coeffs = fit_ellipse(bt_corrected[0], bt_corrected[1])
+        x0, y0, ap, bp, e, phi = cart_to_pol(coeffs)
+        print('\tx0, y0, ap, bp, e, phi = ', x0, y0, ap, bp, e, phi)
+        sigma = round(bp, 3) / round(ap, 3)
+        if abs(1 - sigma) <= 0.001:
+            result = "passed"
+        else:
+            result = "failed"
+
+        print(f"Backtest {result} with axis ratio {sigma}.\n")
+
+        limit = 8./ap
+        print(f"Checking symmetry of corrected data against radial range limit of {limit*100:.2f}%.")
+        r_mag = [math.sqrt(x**2 + y**2) for x, y in zip(bt_corrected[0], bt_corrected[1])]
+        r_mag_min = min(r_mag)
+        r_mag_max = max(r_mag)
+        mag_spread = 1 - r_mag_min / r_mag_max
+        if mag_spread <= limit:
+            result = "passed"
+        else:
+            result = "failed"
+
+        print(f"Radial magnitude ranges from {r_mag_min:.3f} to {r_mag_max:.3f} uT.")
+        print(f"Backtest {result} with radial magnitude spread of {round(mag_spread*100, 2)}%.\n")
+
+        return True if result == "passed" else False
 
 
 def get_records(path):

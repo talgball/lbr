@@ -60,9 +60,9 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         self.hix = hix
         self.hiy = hiy
-        self.corrections = np.array([[0.60928257, 0.13501856], [0.13501856, 0.95334221]])  # todo replace with lookup
-        self.radius = 32.46031859991263  # Set to None to enable rotation method
-        # self.radius = None
+        self.corrections = np.array([[0.70402391, -0.09952104], [-0.09952104, 0.96653636]])  # todo replace with lookup
+        # self.radius = 32.46031859991263  # Set to None to enable rotation method
+        self.radius = None
         self.alpha_setting = None
         self.beta_setting = None
         self.mpu_enabled = True
@@ -321,7 +321,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
         if source is None or source.startswith('-') :
             if source == '-c':
                 # do_save = False
-                do_save = True
+                do_save = False
                 do_show = True
             else:
                 self.hix = 0.
@@ -346,7 +346,8 @@ class RIOX(PyRoboteq.RoboteqHandler):
                     return
 
             if do_show:
-                make_plot(x, y, "Corrected Data", save=False)
+                make_plot(x, y, "Corrected Data")
+                return
 
         try:
             if source is not None and not source.startswith('-'):

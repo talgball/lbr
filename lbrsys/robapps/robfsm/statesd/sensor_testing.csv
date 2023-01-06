@@ -1,0 +1,20 @@
+Type,Current State,heading,Forward,Rear,Left,Right,Amps Left,Amps Right,Volts,Dock Left,Dock Right,Time,O:level,O:angle,O:range,O:sensor,O:duration,O:heading,O:turn,O:speech,Next State
+start,Announcing,,,,,,,,,,,,,,,,,,,I’m initiating Motion Processing Unit  sensor testing.,Gyroscope
+,Gyroscope,,,,,,,,,,,,,,,,,,,Starting with gyroscope,Test 1
+,Test 1,,,,,,,,,,,,,,,,,,90,Turning clockwise 90 degrees,Test 2
+,Test 2,,,,,,,,,,,,,,,,,,-90,Turning counterclockwise 90 degrees,Test 3
+,Test 3,,,,,,,,,,,,,,,,,,180,Turning about,Test 4
+,Test 4,,,,,,,,,,,,,,,,,,180,Turning about again,Test 5
+,Test 5,,,,,,,,,,,,,,,,,,40,Turning 40 degrees,Test 6
+,Test 6,,,,,,,,,,,,,,,,,,60,Turning 60 degrees,Test 7
+,Test 7,,,,,,,,,,,,,,,,,,-100,Turning -100 degrees,Check 1
+,Check 1,,,,,,,,,,,,,,,,,,,I should be back to my initial orientation.,Gyroscope End
+,Gyroscope End,,,,,,,,,,,,,,,,,,,,Magnetometer
+,Magnetometer,,,,,,,,,,,,,,,,,,,Testing magnetometer by turning to compass headings,Test 8
+,Test 8,,,,,,,,,,,,,,,,,90,,Turning to East,Test 9
+,Test 9,,,,,,,,,,,,,,,,,45,,Coming left to 45 degrees,Test 10
+,Test 10,,,,,,,,,,,,,,,,,270,,Making my heading 2 7 0.,Test 11
+,Test 11,,,,,,,,,,,,,,,,,0,,Coming right to North,Test 12
+,Test 12,,,,,,,,,,,,,,,,,225,,Making my heading 225,Check 2
+,Check 2,,,,,,,,,,,,,,,,,180,,I should be facing south.,End
+end,End,,,,,,,,,,,,,,,,,,,Testing is completed.,End

@@ -33,7 +33,7 @@ from lbrsys.settings import gyroLogFile
 
 
 class Observer(object):
-    def __init__(self,angle,qOut,curtime=None,testMode=False):
+    def __init__(self, angle, qOut, curtime=None, testMode=False):
         if not curtime:
             self.curtime = robtimer()
         else:

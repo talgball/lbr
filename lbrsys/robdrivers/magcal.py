@@ -112,6 +112,8 @@ class Magcal(object):
     plot_mgmt: OrderedDict = field(init=False, default_factory=OrderedDict)
     final_corrections: np.array = field(init=False, default=None)
     ellipse: Ellipse_Model = field(init=False, default=None)
+    final_x: list[float] = field(init=False, default_factory=list)
+    final_y: list[float] = field(init=False, default_factory=list)
 
     def __post_init__(self):
         # Configure Plots
@@ -198,44 +200,12 @@ class Magcal(object):
 
         save_mag_corrections(mag_corr)
 
+        save_corrected_samples(self.final_x, self.final_y)
+
         return
 
     def close_figures(self):
         plt.close('all')
-
-    def iron_corrections_orig_algorithm(self):
-        self.plot(self.raw_x, self.raw_y, '.', fig_name='raw', color='cyan')
-
-        tolerance = 0.001
-        final_corrections = None
-
-        self.alpha, self.beta, self.x, self.y = correct_hard_iron(self.raw_x, self.raw_y)
-        print(f"alpha: {self.alpha}, beta: {self.beta}")
-
-        corrected_ax = self.plot(self.x, self.y, '.', fig_name='hard_iron', color='blue')
-
-        self.r_mag = [math.sqrt((x)**2 + (y)**2) for x, y in zip(self.x, self.y)]
-        self.major_axis = max(self.r_mag)
-        self.minor_axis = min(self.r_mag)
-        print(f"Major axis: {self.major_axis}, Minor axis: {self.minor_axis}")
-        assert self.major_axis != 0, f"Unexpected 0 major axis in iron_correction"
-
-        if abs(self.major_axis - self.minor_axis) > tolerance:
-            self.soft_iron = True
-
-            final_corrections = self.soft_iron_by_ellipse()
-            # final_corrections = self.soft_iron_by_rotation()
-
-            self.save()
-            self.show()
-            self.close_figures()
-
-        else:
-            print("Soft iron correction not required")
-
-        self.final_corrections = final_corrections
-
-        return self.alpha, self.beta, self.final_corrections
 
     def iron_corrections(self):
         self.plot(self.raw_x, self.raw_y, '.', fig_name='raw', color='cyan')
@@ -294,6 +264,8 @@ class Magcal(object):
             print(f"sigma: {sigma}")
             x_circle = sigma * rotated[0]
             ax.plot(x_circle, rotated[1], '.', color='green')
+            self.x_final = x_circle
+            self.y_final = rotated[1]
 
             # rotate the compressed ellipse back into its original angle
             phi_neg = -phi
@@ -359,7 +331,7 @@ class Magcal(object):
         return True if result == "passed" else False
 
 
-def get_records(path):
+def get_samples(path):
     with open(path, 'r') as f:
         records = f.readlines()
 
@@ -373,6 +345,30 @@ def get_records(path):
         y.append(float(fields[1]))
 
     return x, y
+
+
+def save_samples(samples, path=None):
+    """Write magnetometer samples to path.  Assumes full mag namedtuple is present"""
+    if path is None:
+        path = magCalibrationLogFile.format(today=date.today())
+
+    with open(magCalibrationLogFile, 'w') as f:
+        print("X, Y, Z, Heading", file=f)
+        for s in samples:
+            print(f"{s.mag.x},{s.mag.y},{s.mag.z},{s.heading}", file=f)
+
+
+def save_corrected_samples(x, y, path=None):
+    """Write corrected x and y sample values to path"""
+    if path is None:
+        corrected_file = os.path.join(MAG_CALIBRATION_DIR,
+                                      "{today}-mag-0-corrected-calibration-data.csv")
+        corrected_file = corrected_file.format(today=date.today())
+
+    with open(corrected_file, 'w') as f:
+        print("X-Corrected,Y-Corrected", file=f)
+        for i in range(len(x)):
+            print(f"{x[i]},{y[i]}", file=f)
 
 
 def outliers(data, tolerance=2):
@@ -439,8 +435,9 @@ def correct_hard_iron(x, y):
     return alpha, beta, x_corrected, y_corrected
 
 
-def make_plot(x, y, title="Sensor Data", image_file=None,
-              xlabel='x uT', ylabel='y uT'):
+def make_plot(x, y, title="Sensor Data", image_file=None, xlabel='x uT', ylabel='y uT'):
+    """Make one-off plots on demand, like when the -c option is used to view
+        data through the lens of current corrections."""
 
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.figure(figsize=(8, 8))
@@ -453,8 +450,9 @@ def make_plot(x, y, title="Sensor Data", image_file=None,
 
     plt.ylim(ylim_min, ylim_max)
     plt.xlim(xlim_min, xlim_max)
-    # fig1, ax = plt.subplots()
-    # ax.set_box_aspect(1)
+    ax = plt.gca()
+    ax.axis('equal')
+    ax.set_box_aspect(1)
 
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -464,19 +462,13 @@ def make_plot(x, y, title="Sensor Data", image_file=None,
     plt.plot(x, y, '.', color='blue')
 
     if image_file is not None:
-        # fig = plt.gcf()
         plt.savefig(image_file)
 
-    # plt.ioff()
     plt.show()
-
-    # This fails and generates:
-    #   "UserWarning: Starting a Matplotlib GUI outside of the main thread will likely fail.
-    # plot_thread = Thread(target=plt.show, daemon=True)
-    # plot_thread.start()
 
 
 def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
+    """This function is deprecated."""
     today = str(date.today())
     raw_fname = base_plot_name + "raw-" + today + '.png'
     corrected_fname = base_plot_name + "corrected-" + today + '.png'
@@ -486,7 +478,7 @@ def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
     if x is None or y is None:
         if data_file is None:
             data_file = magCalibrationLogFile
-        x, y = get_records(data_file)
+        x, y = get_samples(data_file)
 
     make_plot(x, y, "Magnetometer - Uncorrected", raw_image)
     alpha, beta, xc, yc = correct_hard_iron(x, y)
@@ -495,26 +487,11 @@ def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
 
     return alpha, beta, xc, yc
 
-def get_mag_corrections():
-    mc = None
-    mag_corrs = []
-    for c in ['MAG_ALPHA', 'MAG_BETA', 'MAG_COR0', 'MAG_COR1', 'MAG_COR2', 'MAG_COR3']:
-        corr, corr_setting = robot_calibrations.find_setting(c)
-        if corr_setting is not None:
-            mag_corrs.append(corr)
-        else:
-            mag_corrs.append(0.0)
-
-    return mag_corrections(mag_corrs[0], mag_corrs[1],
-                           mag_corrs[2], mag_corrs[3],
-                           mag_corrs[4], mag_corrs[5],
-                           )
-
 
 def save_mag_corrections(new_corrections):
     i = 0
     for c in ['MAG_ALPHA', 'MAG_BETA', 'MAG_COR0', 'MAG_COR1', 'MAG_COR2', 'MAG_COR3']:
-        corr, corr_setting = robot_calibrations.find_setting(c)
+        corr, corr_setting = robot_calibrations.get_setting(c)
         if corr_setting is not None:
             corr_setting.value = new_corrections[i]
             corr_setting.save()
@@ -529,35 +506,29 @@ def save_mag_corrections(new_corrections):
     return
 
 
+def get_mag_corrections():
+    corrs = []
+    corr_keys = ['MAG_ALPHA', 'MAG_BETA', 'MAG_COR0', 'MAG_COR1', 'MAG_COR2', 'MAG_COR3']
+    for c in corr_keys:
+        corr, corr_setting = robot_calibrations.get_setting(c)
+        if corr_setting is not None:
+            corrs.append(corr)
+    if len(corrs) != len(corr_keys):
+        print("Error getting magnetometer corrections:")
+        print(f"\tFound {len(corrs)} of {len(corr_keys)} required.")
+
+    return mag_corrections(*corrs)
+
 if __name__ == '__main__':
     # matplotlib.use('Qt5Agg')
     # matplotlib.use('Agg')
     # calc_mag_correction(data_file='/home/robot/lbr/logs/magCalibration.csv')
     # x, y = get_records('/home/robot/lbr/logs/mag_working/magCalibration.csv')
-    x, y = get_records('/home/robot/lbr/logs/magCalibration-2023-01-01-raw.csv')
+    x, y = get_samples('/home/robot/lbr/logs/magCalibration-2023-01-01-raw.csv')
     # x, y = get_records(magCalibrationLogFile.format(today=str(date.today()))) # this only works for today's files
 
-    mc = Magcal(x, y)
+    mc = Magcal(x, y, show_enabled=False, save_enabled=True)
     print(get_mag_corrections())
     print(mc.iron_corrections())
     print(get_mag_corrections())
 
-    """
-    hix = -34.35
-    hiy = 8.85
-    corrections = np.array([[0.39592896, 0.48238524], [-0.48238524, 0.83330418]])
-
-    xc = []
-    yc = []
-
-    for xi, yi in zip(x, y):
-        hadj = [xi - hix, yi - hiy, -25.]
-        hadj_soft = corrections @ np.array([[hadj[0]], [hadj[1]]])
-        hadj = list([hadj_soft[0][0], hadj_soft[1][0], hadj[2]])
-        xc.append(hadj[0])
-        yc.append(hadj[1])
-        
-
-
-    make_plot(xc, yc, "Corrected - directly")
-    """

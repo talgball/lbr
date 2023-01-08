@@ -53,18 +53,6 @@ class CalibrationSetting: # todo consider eliminating id and making compound pk 
     name: str
     value: float
     id: int = 0
-    # con: Any = None
-    # cursor: Any = None
-
-    '''
-    def __post_init__(self):
-        try:
-            self.con = sqlite3.connect(dbfile)
-            self.con.row_factory = sqlite3.Row
-            self.cursor = self.con.cursor()
-        except Exception as e:
-            print(f"Error connecting to calibrary database: {e}")
-    '''
 
     def save(self):
         if self.id != 0:
@@ -107,6 +95,17 @@ class CalibrationSetting: # todo consider eliminating id and making compound pk 
 class Calibration:
     settings: List[CalibrationSetting] = field(default_factory=load_calibrations)
 
+    calibration_d: dict = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.calibration_d = {}
+        self.make_cald()
+
+    def make_cald(self):
+        self.calibration_d = {}
+        for s in self.settings:
+            self.calibration_d[s.name] = s
+
     def find_setting(self, name, default=0.):
         value = default
         found = None
@@ -117,8 +116,15 @@ class Calibration:
                 break
         return value, found
 
+    def get_setting(self, name, default=0.):
+        s = self.calibration_d.get(name, None)
+        value = default if s is None else s.value
+
+        return value, s
+
     def update(self):
         self.settings = load_calibrations()
+        self.make_cald()
 
 
 if __name__ == '__main__':

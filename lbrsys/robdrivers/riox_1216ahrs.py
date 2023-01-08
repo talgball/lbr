@@ -33,7 +33,7 @@ import PyRoboteq
 
 from pyquaternion import Quaternion
 
-from lbrsys import robot_id, gyro, accel, mag, mpuData, euler, mag_corrections
+from lbrsys import robot_id, gyro, accel, mag, mpuData, euler
 from lbrsys.robcom import publisher
 from lbrsys.settings import LOG_DIR
 from lbrsys.settings import X_Convention, Y_Convention, Z_Convention
@@ -41,7 +41,8 @@ from lbrsys.settings import magCalibrationLogFile
 from lbrsys.settings import RIOX_1216AHRS_Port
 
 from lbrsys.robdrivers.calibration import Calibration, CalibrationSetting
-from lbrsys.robdrivers.magcal import calc_mag_correction, make_plot, get_mag_corrections
+from lbrsys.robdrivers.magcal import get_samples, make_plot, get_mag_corrections, save_samples
+from lbrsys.robdrivers.magcal import Magcal
 
 # Commands for RIOX not covered by PyRoboteq, as it was designed for a motor controller
 READ_ALL_MEMS = '?ML'
@@ -58,12 +59,11 @@ class RIOX(PyRoboteq.RoboteqHandler):
         super(RIOX, self).__init__(debug_mode=False, exit_on_interrupt=False)
         self.port = port
 
-        self.mag_corrections = None
-        self.hix = -34.35
-        self.hiy = -8.85
-        self.corrections = np.array([[0.70402391, -0.09952104], [-0.09952104, 0.96653636]])  # todo replace with lookup
-        self.alpha_setting = None
-        self.beta_setting = None
+        # self.hix = -34.35
+        # self.hiy = -8.85
+        # self.corrections = np.array([[0.70402391, -0.09952104], [-0.09952104, 0.96653636]])  # todo replace with lookup
+        # self.alpha_setting = None
+        # self.beta_setting = None
         self.mpu_enabled = True
         self.mems_enabled = True
         self.ahrs_enabled = False
@@ -104,16 +104,19 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         self.lastRawAngle = -1
         self.unitConTime = 0
-        self.numReads    = 0
+        self.numReads = 0
+
+        self.mag_corrections = get_mag_corrections()
+        self.alpha = self.mag_corrections.alpha
+        self.beta = self.mag_corrections.beta
+        mc = self.mag_corrections
+        self.corrections = np.array([[mc.xform0, mc.xform1], [mc.xform2, mc.xform3]])
 
         try:
             self.connected = self.connect(self.port)
         except Exception as e:
             print(f"Error connecting to RIOX on {port}")
             raise e
-
-        self.mag_corrections = self.fetch_mag_corrections
-
 
     def read(self):
         if self.mems_enabled:
@@ -269,20 +272,12 @@ class RIOX(PyRoboteq.RoboteqHandler):
         Make hard and soft iron adjustments here.  As of 2019-01-28,
         lbr2a required hard iron adjustments but not soft iron.
 
-        lbr6 needed both hard and soft iron adjustments as of 2022-12-30
-
-        Two methods of soft iron correction are provided:
-        If radius is available, move the given point onto a circle with the given
-        radius, preserving the angle of a ray passing through the origin and the point.
-
-        If radius is not available, use the rotation matrix corrections.
-
-        Otherwise, adjust hard iron only.
-
+        lbr6 needed both hard and soft iron adjustments as of 2022-12-30,
+            leading to implementation of soft iron capabilities in magcal.py
         """
 
         # Get the hard iron adjustment out of the way
-        hadj = [h[0]-self.hix, h[1]-self.hiy, h[2]]
+        hadj = [h[0]-self.alpha, h[1]-self.beta, h[2]]
 
         if self.corrections is not None:
             hadj_soft = self.corrections @ np.array([[hadj[0]], [hadj[1]]])
@@ -295,36 +290,43 @@ class RIOX(PyRoboteq.RoboteqHandler):
         Execute calibration procedure to calculate the hard and soft
         iron adjustments.  Note that the robot must be in a safe location for spinning
         around it's Z axis in order to collect the data.
-        :param: samples - the number of magnetometer readings to collect
+
+        :param: samples - Number of magnetometer readings to collect
         :param: source - Collect new samples if None or '-', otherwise read samples from path given by source.
             If '-c' then collect and view samples via existing corrections.
+        :param: do_save - Persist the calibration results and data
+        :param: do_show - Show graphical plots of the calibration analysis
         :return:
         """
-        # todo cleanup and integrate saving functions now that soft iron is implemented
 
         if samples > 1000:
             print(f"Samples limited to 1000 instead of {samples}")
             samples = 1000
 
+        do_save = True
+        do_show = False
+
         cal_data = []
         x = None
         y = None
 
-        # todo externalize logic to control these flags
-        do_save = True
-        do_show = False
-
-        if source is None or source.startswith('-') :
+        if source is None or source.startswith('-'):
+            # Collecting new samples
             if source == '-c':
-                # do_save = False
+                # Leave current corrections in place so that samples are corrected.
+                #   Used to visualize effectiveness of current corrections.
+                print("Collecting new magnetometer samples and applying current corrections.")
                 do_save = False
                 do_show = True
             else:
-                self.hix = 0.
-                self.hiy = 0.
+                # Clear current corrections so that raw data will be collected to
+                #   support calculation of new corrections
+                print("Collecting new, raw magnetometer samples.")
+                self.alpha = 0.
+                self.beta = 0.
                 self.corrections = None
 
-            print("Collecting magnetometer calibration data.  Robot should be spinning about its z axis.")
+            print("Robot should be spinning about its z axis.")
             for r in range(samples):
                 cal_data.append(self.read())
                 time.sleep(0.150)
@@ -336,57 +338,27 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
             if do_save:
                 try:
-                    self.save_cal_data(cal_data)
+                    save_samples(cal_data)
                 except Exception as e:
                     print(f"Error saving magnetometer samples:\n{str(e)}")
                     return
 
-            if do_show:
+            if do_show and source == '-c':
                 make_plot(x, y, "Corrected Data")
                 return
 
-        try:
-            if source is not None and not source.startswith('-'):
-                source_path = os.path.join(LOG_DIR, source)
-            else:
-                source_path = None
+        else:
+            # read data from path and recalculate corrections
+            source_path = os.path.join(LOG_DIR, source)
 
-            alpha, beta, x_corrected, y_corrected = calc_mag_correction(x, y, source_path)
-            self.hix = alpha
-            self.hiy = beta
+            x, y = get_samples(source_path)
+            mag_cal = Magcal(x, y, show_enabled=do_show, save_enabled=do_save)
+            self.alpha, self.beta, self.corrections = mag_cal.iron_corrections()
 
-            if self.alpha_setting is None:
-                self.alpha_setting = CalibrationSetting(robot_id, 'MAG_ALPHA', alpha)
-            else:
-                self.alpha_setting.value = alpha
-            self.alpha_setting.save()
-
-            if self.beta_setting is None:
-                self.beta_setting = CalibrationSetting(robot_id, 'MAG_BETA', beta)
-            else:
-                self.beta_setting.value = beta
-            self.beta_setting.save()
-
-            self.save_corrected(x_corrected, y_corrected)
-            print(f"Completed hard iron calibration with alpha {alpha}, beta {beta}")
-
-        except Exception as calexception:
-            print(f"Error calibrating magnetometer:\n{str(calexception)}")
+        print("Completed calibration process:")
+        print(f"\t{self.alpha},{self.beta}, self.final_corrections")
 
         return
-
-    def save_cal_data(self, cal_data):
-        with open(magCalibrationLogFile, 'w') as f:
-            print("X,Y,Z,Heading", file=f)
-            for r in cal_data:
-                print(f"{r.mag.x},{r.mag.y},{r.mag.z},{r.heading}", file=f)
-
-    def save_corrected(self, x, y):
-        with open(magCalibrationLogFile+'-corrected', 'w') as f:
-            print("X-Corrected,Y-Corrected", file=f)
-            for i in range(len(x)):
-                print(f"{x[i]},{y[i]}", file=f)
-
 
     def reset(self):
         return

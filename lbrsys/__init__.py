@@ -23,6 +23,7 @@ import sqlite3
 from collections import namedtuple
 
 from lbrsys.settings import dbfile, robot_name
+from lbrsys.robdrivers.calibration import Calibration, CalibrationSetting
 
 # Named tuple definitions are used across lbrsys to build objects for
 # communicating commands, state and feedback or telemetry between modules
@@ -44,7 +45,7 @@ observeHeading = namedtuple('observeHeading', 'heading')
 executeHeading = namedtuple('executeHeading', 'heading')
 observeRange = namedtuple('observeRange', 'nav')
 calibrateMagnetometer = namedtuple('calibrateMagnetometer', 'samples source')
-mag_corrections = namedtuple('mag_corrections', 'alpha beta xform')
+mag_corrections = namedtuple('mag_corrections', 'alpha beta xform0, xform1, xform2, xform3')
 
 distance    = namedtuple('distance', 'n s e w t')
 
@@ -109,3 +110,5 @@ def get_robot_id(name):
 
 
 robot_id = get_robot_id(robot_name)
+
+robot_calibrations = Calibration()

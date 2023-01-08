@@ -1,6 +1,5 @@
 """
-calibration.py - Execute calibration processes for sensors with complex
-    requirements such as magnetometers.
+calibration.py - Manage calibration data access and persistence.
 """
 
 __author__ = "Tal G. Ball"
@@ -117,6 +116,9 @@ class Calibration:
                 found = s
                 break
         return value, found
+
+    def update(self):
+        self.settings = load_calibrations()
 
 
 if __name__ == '__main__':

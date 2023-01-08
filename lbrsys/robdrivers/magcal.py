@@ -37,7 +37,7 @@ import statistics
 from datetime import date
 from datalite import datalite, fetch
 
-from lbrsys import robot_id, mag_corrections
+from lbrsys import robot_id, mag_corrections, robot_calibrations
 from lbrsys.settings import dbfile
 from lbrsys.settings import LOG_DIR
 from lbrsys.settings import MAG_CALIBRATION_DIR, magCalibrationLogFile
@@ -190,6 +190,13 @@ class Magcal(object):
             if fig.gca().lines:
                 image_full_path = os.path.join(MAG_CALIBRATION_DIR, image_file_name)
                 plt.savefig(image_full_path)
+
+        mag_corr = mag_corrections(self.alpha, self.beta,
+                                   self.final_corrections[0][0], self.final_corrections[0][1],
+                                   self.final_corrections[1][0], self.final_corrections[1][1],
+                                   )
+
+        save_mag_corrections(mag_corr)
 
         return
 
@@ -488,22 +495,38 @@ def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
 
     return alpha, beta, xc, yc
 
-def get_mag_corrections(robot_id):
-    cal = Calibration()
+def get_mag_corrections():
     mc = None
     mag_corrs = []
     for c in ['MAG_ALPHA', 'MAG_BETA', 'MAG_COR0', 'MAG_COR1', 'MAG_COR2', 'MAG_COR3']:
-        corr, corr_setting = cal.find_setting(c)
+        corr, corr_setting = robot_calibrations.find_setting(c)
         if corr_setting is not None:
             mag_corrs.append(corr)
         else:
             mag_corrs.append(0.0)
 
-    return mag_corrections(mag_corrs[0], mag_corrs[1], mag_corrs[2:])
+    return mag_corrections(mag_corrs[0], mag_corrs[1],
+                           mag_corrs[2], mag_corrs[3],
+                           mag_corrs[4], mag_corrs[5],
+                           )
 
-def save_mag_corrections(robot_id):
-    pass
-    # ******* resume work here *********
+
+def save_mag_corrections(new_corrections):
+    i = 0
+    for c in ['MAG_ALPHA', 'MAG_BETA', 'MAG_COR0', 'MAG_COR1', 'MAG_COR2', 'MAG_COR3']:
+        corr, corr_setting = robot_calibrations.find_setting(c)
+        if corr_setting is not None:
+            corr_setting.value = new_corrections[i]
+            corr_setting.save()
+        else:
+            s = CalibrationSetting(robot_id, c, new_corrections[i])
+            s.save()
+        i += 1
+
+    # reload calibrations
+    robot_calibrations.update()  # todo find strategy to make thread safe (not yet an issue as of Jan, 2023)
+
+    return
 
 
 if __name__ == '__main__':
@@ -515,8 +538,9 @@ if __name__ == '__main__':
     # x, y = get_records(magCalibrationLogFile.format(today=str(date.today()))) # this only works for today's files
 
     mc = Magcal(x, y)
-    print(get_mag_corrections(robot_id))
-    # print(mc.iron_corrections())
+    print(get_mag_corrections())
+    print(mc.iron_corrections())
+    print(get_mag_corrections())
 
     """
     hix = -34.35

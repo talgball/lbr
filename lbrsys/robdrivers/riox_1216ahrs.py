@@ -112,6 +112,13 @@ class RIOX(PyRoboteq.RoboteqHandler):
         mc = self.mag_corrections
         self.corrections = np.array([[mc.xform0, mc.xform1], [mc.xform2, mc.xform3]])
 
+        # temporary additional correction test
+        adjustment = (-17.375-12) * np.pi / 180.  # todo externalize fude factor for particular robot
+        add_corr = np.array([[np.cos(adjustment), np.sin(adjustment)],
+                             [-np.sin(adjustment), np.cos(adjustment)]])
+
+        self.corrections = add_corr @ self.corrections
+
         try:
             self.connected = self.connect(self.port)
         except Exception as e:
@@ -352,11 +359,12 @@ class RIOX(PyRoboteq.RoboteqHandler):
             source_path = os.path.join(LOG_DIR, source)
 
             x, y = get_samples(source_path)
-            mag_cal = Magcal(x, y, show_enabled=do_show, save_enabled=do_save)
-            self.alpha, self.beta, self.corrections = mag_cal.iron_corrections()
+
+        mag_cal = Magcal(x, y, show_enabled=do_show, save_enabled=do_save)
+        self.alpha, self.beta, self.corrections = mag_cal.iron_corrections()
 
         print("Completed calibration process:")
-        print(f"\t{self.alpha},{self.beta}, self.final_corrections")
+        print(f"\t{self.alpha},{self.beta}, {self.corrections}")
 
         return
 

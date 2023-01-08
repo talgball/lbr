@@ -205,7 +205,7 @@ class Robot(object):
                     exec(command[1:])
                 except Exception as e:
                     print("Error executing '%s',%s, %s" %
-                    (command[1:],sys.exc_info()[0],e))
+                    (command[1:], sys.exc_info()[0], e))
                 continue
 
             # check to see if the command is external

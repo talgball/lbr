@@ -264,8 +264,8 @@ class Magcal(object):
             print(f"sigma: {sigma}")
             x_circle = sigma * rotated[0]
             ax.plot(x_circle, rotated[1], '.', color='green')
-            self.x_final = x_circle
-            self.y_final = rotated[1]
+            self.final_x = x_circle
+            self.final_y = rotated[1]
 
             # rotate the compressed ellipse back into its original angle
             phi_neg = -phi
@@ -349,10 +349,14 @@ def get_samples(path):
 
 def save_samples(samples, path=None):
     """Write magnetometer samples to path.  Assumes full mag namedtuple is present"""
+
+    if not os.path.isdir(MAG_CALIBRATION_DIR):
+        os.mkdir(MAG_CALIBRATION_DIR)
+
     if path is None:
         path = magCalibrationLogFile.format(today=date.today())
 
-    with open(magCalibrationLogFile, 'w') as f:
+    with open(path, 'w') as f:
         print("X, Y, Z, Heading", file=f)
         for s in samples:
             print(f"{s.mag.x},{s.mag.y},{s.mag.z},{s.heading}", file=f)

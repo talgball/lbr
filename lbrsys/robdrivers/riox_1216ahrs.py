@@ -33,7 +33,7 @@ import PyRoboteq
 
 from pyquaternion import Quaternion
 
-from lbrsys import robot_id, gyro, accel, mag, mpuData, euler
+from lbrsys import robot_id, gyro, accel, mag, mpuData, euler, mag_corrections
 from lbrsys.robcom import publisher
 from lbrsys.settings import LOG_DIR
 from lbrsys.settings import X_Convention, Y_Convention, Z_Convention
@@ -41,7 +41,7 @@ from lbrsys.settings import magCalibrationLogFile
 from lbrsys.settings import RIOX_1216AHRS_Port
 
 from lbrsys.robdrivers.calibration import Calibration, CalibrationSetting
-from lbrsys.robdrivers.magcal import calc_mag_correction, make_plot
+from lbrsys.robdrivers.magcal import calc_mag_correction, make_plot, get_mag_corrections
 
 # Commands for RIOX not covered by PyRoboteq, as it was designed for a motor controller
 READ_ALL_MEMS = '?ML'
@@ -54,15 +54,14 @@ class RIOX(PyRoboteq.RoboteqHandler):
     zeroAccelResult = accel(0.0,0.0,0.0)
     zeroMagResult = mag(0.0,0.0,0.0)
 
-    def __init__(self, port=RIOX_1216AHRS_Port, hix=-34.35, hiy=8.85):
+    def __init__(self, port=RIOX_1216AHRS_Port):
         super(RIOX, self).__init__(debug_mode=False, exit_on_interrupt=False)
         self.port = port
 
-        self.hix = hix
-        self.hiy = hiy
+        self.mag_corrections = None
+        self.hix = -34.35
+        self.hiy = -8.85
         self.corrections = np.array([[0.70402391, -0.09952104], [-0.09952104, 0.96653636]])  # todo replace with lookup
-        # self.radius = 32.46031859991263  # Set to None to enable rotation method
-        self.radius = None
         self.alpha_setting = None
         self.beta_setting = None
         self.mpu_enabled = True
@@ -112,6 +111,9 @@ class RIOX(PyRoboteq.RoboteqHandler):
         except Exception as e:
             print(f"Error connecting to RIOX on {port}")
             raise e
+
+        self.mag_corrections = self.fetch_mag_corrections
+
 
     def read(self):
         if self.mems_enabled:
@@ -282,13 +284,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
         # Get the hard iron adjustment out of the way
         hadj = [h[0]-self.hix, h[1]-self.hiy, h[2]]
 
-        if self.radius is not None:
-            a = atan2(hadj[1], hadj[0])
-            xc = self.radius * cos(a)
-            yc = self.radius * sin(a)
-            hadj = [xc, yc, h[2]]
-
-        elif self.corrections is not None:
+        if self.corrections is not None:
             hadj_soft = self.corrections @ np.array([[hadj[0]], [hadj[1]]])
             hadj = list([hadj_soft[0][0], hadj_soft[1][0], h[2]])
 

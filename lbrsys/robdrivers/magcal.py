@@ -35,11 +35,41 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statistics
 from datetime import date
+from datalite import datalite, fetch
 
+from lbrsys import robot_id, mag_corrections
+from lbrsys.settings import dbfile
 from lbrsys.settings import LOG_DIR
 from lbrsys.settings import MAG_CALIBRATION_DIR, magCalibrationLogFile
 
 from lbrsys.robdrivers.ellipse_fit import fit_ellipse, get_ellipse_pts, cart_to_pol
+from lbrsys.robdrivers.calibration import Calibration, CalibrationSetting
+
+"""  todo - consider switching approach to use datalite
+@datalite(db_path=dbfile)
+@dataclass
+class Mag_Calibration(object):
+    robot_id: int = 0
+    alpha: float = 0.0
+    beta: float = 0.0
+    t0: float = 0.0
+    t1: float = 0.0
+    t2: float = 0.0
+    t3: float = 0.0
+
+    def __post_init__(self):
+        pass
+
+
+def fetch_mag_calibration(self, robot_id):
+    cal = None
+    cals = fetch.fetch_if(Mag_Calibration, "robot_id == ?", (robot_id,))
+    if len(cals) != 0:
+        cal = cals[0]
+
+    print(f"Fetched mag calibration for {robot_id}: {cal}")
+    return cal
+"""
 
 @dataclass
 class Ellipse_Model(object):
@@ -458,6 +488,23 @@ def calc_mag_correction(x=None, y=None, data_file=None, base_plot_name='mag'):
 
     return alpha, beta, xc, yc
 
+def get_mag_corrections(robot_id):
+    cal = Calibration()
+    mc = None
+    mag_corrs = []
+    for c in ['MAG_ALPHA', 'MAG_BETA', 'MAG_COR0', 'MAG_COR1', 'MAG_COR2', 'MAG_COR3']:
+        corr, corr_setting = cal.find_setting(c)
+        if corr_setting is not None:
+            mag_corrs.append(corr)
+        else:
+            mag_corrs.append(0.0)
+
+    return mag_corrections(mag_corrs[0], mag_corrs[1], mag_corrs[2:])
+
+def save_mag_corrections(robot_id):
+    pass
+    # ******* resume work here *********
+
 
 if __name__ == '__main__':
     # matplotlib.use('Qt5Agg')
@@ -468,7 +515,8 @@ if __name__ == '__main__':
     # x, y = get_records(magCalibrationLogFile.format(today=str(date.today()))) # this only works for today's files
 
     mc = Magcal(x, y)
-    print(mc.iron_corrections())
+    print(get_mag_corrections(robot_id))
+    # print(mc.iron_corrections())
 
     """
     hix = -34.35

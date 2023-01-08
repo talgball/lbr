@@ -114,6 +114,7 @@ class Calibration:
         for s in self.settings:
             if s.name == name:
                 value = s.value
+                found = s
                 break
         return value, found
 

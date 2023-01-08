@@ -44,6 +44,7 @@ observeHeading = namedtuple('observeHeading', 'heading')
 executeHeading = namedtuple('executeHeading', 'heading')
 observeRange = namedtuple('observeRange', 'nav')
 calibrateMagnetometer = namedtuple('calibrateMagnetometer', 'samples source')
+mag_corrections = namedtuple('mag_corrections', 'alpha beta xform')
 
 distance    = namedtuple('distance', 'n s e w t')
 

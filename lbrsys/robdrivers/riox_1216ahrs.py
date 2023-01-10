@@ -28,6 +28,7 @@ import os
 import sys
 import time
 from math import *
+import logging
 import numpy as np
 import PyRoboteq
 
@@ -54,6 +55,8 @@ class RIOX(PyRoboteq.RoboteqHandler):
     zeroGyroResult = gyro(0.0,0.0,0.0,0.0)
     zeroAccelResult = accel(0.0,0.0,0.0)
     zeroMagResult = mag(0.0,0.0,0.0)
+    defaultQuaternion = Quaternion()
+    defaultEuler = euler(0., 0., 0.)
 
     def __init__(self, port=RIOX_1216AHRS_Port):
         super(RIOX, self).__init__(debug_mode=False, exit_on_interrupt=False)
@@ -66,7 +69,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
         # self.beta_setting = None
         self.mpu_enabled = True
         self.mems_enabled = True
-        self.ahrs_enabled = False
+        self.ahrs_enabled = True
         self.read_errors = 0
         self.error_limit = 3
         self.mpuPub     = publisher.Publisher("MPU Message Publisher")
@@ -93,19 +96,25 @@ class RIOX(PyRoboteq.RoboteqHandler):
         self.lastg      = self.zeroGyroResult
         self.lasta      = self.zeroAccelResult
         self.lastm      = self.zeroMagResult
+
+        # todo all for switching reported mpuData between quaternions and Euler angles
         self.lastsu     = mpuData(self.zeroGyroResult,
                                   self.zeroAccelResult,
                                   self.zeroMagResult,
-                                  0.,0.,0.)
+                                  0., 0., 0.,
+                                  self.defaultQuaternion, 0.)
         self.mpusu_zero = mpuData(self.zeroGyroResult,
                                   self.zeroAccelResult,
                                   self.zeroMagResult,
-                                  0., 0., 0.)
+                                  0., 0., 0.,
+                                  self.defaultQuaternion, 0.)
 
         self.lastRawAngle = -1
         self.unitConTime = 0
         self.numReads = 0
 
+        self.current_quaternion = self.defaultQuaternion
+        self.current_euler = self.defaultEuler
         self.mag_corrections = get_mag_corrections()
         self.alpha = self.mag_corrections.alpha
         self.beta = self.mag_corrections.beta
@@ -113,7 +122,7 @@ class RIOX(PyRoboteq.RoboteqHandler):
         self.corrections = np.array([[mc.xform0, mc.xform1], [mc.xform2, mc.xform3]])
 
         # temporary additional correction test
-        adjustment = (-17.375-12) * np.pi / 180.  # todo externalize fude factor for particular robot
+        adjustment = (-17.375-12) * np.pi / 180.  # todo externalize fudge factor for particular robot
         add_corr = np.array([[np.cos(adjustment), np.sin(adjustment)],
                              [-np.sin(adjustment), np.cos(adjustment)]])
 
@@ -137,6 +146,12 @@ class RIOX(PyRoboteq.RoboteqHandler):
     def read_mems(self):
         if not self.mpu_enabled:
             return self.mpusu_zero
+
+        if self.ahrs_enabled:
+            # mpuData does not currently support 'Euler, even though read_ahrs does'
+            self.current_quaternion = self.read_ahrs(units='Quaternion')
+        else:
+            self.current_quaternion = self.defaultQuaternion
 
         mems = self.read_value(READ_ALL_MEMS)
         t = time.time()
@@ -259,7 +274,9 @@ class RIOX(PyRoboteq.RoboteqHandler):
             else: # Quad 4
                 heading = round((360. - abs(rawAngle)), 0)
 
-        su = mpuData(g, a, m, round(heading, 2), temperature, round(t, 4))
+        su = mpuData(g, a, m, round(heading, 2), temperature, round(t, 4),
+                     self.current_quaternion,
+                     round(self.current_quaternion.degrees, 2))
 
         deltat = time.time() - t0
         self.unitConTime += deltat
@@ -378,27 +395,34 @@ class RIOX(PyRoboteq.RoboteqHandler):
 
         if units not in ['Quaternion', 'Euler']:
             print(f"Invalid units for read_ahrs: {units}")
-            return Quaternion()
+            return self.current_quaternion
+
+        ahrs_out = self.current_quaternion if units == 'Quaternion' else self.current_euler
 
         cmd = READ_AHRS_QUATERNION if units == 'Quaternion' else READ_AHRS_DEGREES
-        ahrs = self.read_value(cmd)
-        ahrs = list(map(int, ahrs.split('=')[1].split(':')))
+        try:
+            ahrs = self.read_value(cmd)
+            ahrs = list(map(int, ahrs.split('=')[1].split(':')))
+        except IndexError:
+            return ahrs_out
+        except ValueError:
+            return ahrs_out
 
         if units == 'Quaternion':
             if len(ahrs) == 4:
                 ahrs_out = Quaternion(*list(map(lambda x: round(x/16834., 6), ahrs)))
+                self.current_quaternion = ahrs_out
             else:
-                print(f"Invalid AHRS for Quaternion: {ahrs}")
-                ahrs_out = Quaternion()
+                # print(f"Invalid AHRS for Quaternion: {ahrs}")
+                ahrs_out = self.current_quaternion
         else:
             if len(ahrs) == 3:
                 ahrs_out = euler(*list(map(lambda x: round(x/16834., 4), ahrs)))
+                self.current_euler = ahrs_out
             else:
-                print(f"Invalid AHRS for Euler Angles: {ahrs}")
-                ahrs_out = euler(0., 0., 0.)
+                # print(f"Invalid AHRS for Euler Angles: {ahrs}")
+                ahrs_out = self.current_euler
 
-        # todo add defaults to mpuData so that this function can return mpuData to
-        #  integrate with the system and/or merge ahrs into mems mpuData
         return ahrs_out
 
     def close(self):
@@ -424,13 +448,17 @@ def test(n=10, units='Quaternion'):
 
 
 if __name__ == '__main__':
-    """
-    results = test(10, 'Quaternion')
-    if len(results) <= 100:
-        print(results)
-    """
     controller = RIOX()
+
+    results_q = test(10, 'Quaternion')
+    results_e = test(10, 'Euler')
+    if len(results_e) <= 100:
+        for q, e in zip(results_q, results_e):
+            print(f"{q.yaw_pitch_roll}, {q.degrees}, {e}")
+
+    """
     for i in range(10):
         print(controller.read_mems())
+    """
 
     controller.close()

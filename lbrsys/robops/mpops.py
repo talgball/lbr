@@ -55,13 +55,13 @@ else:
 proc = multiprocessing.current_process()
 
 if proc.name  == 'Motion Processing Services':# or proc.name == 'MainProcess':
-    logging.basicConfig( level=logging.DEBUG,
-                     filename=mpLogFile,
-                     format='[%(levelname)s] (%(processName)-10s) %(message)s', )
+    logging.basicConfig(level=logging.DEBUG,
+                        filename=mpLogFile,
+                        format='[%(levelname)s] (%(processName)-10s) %(message)s', )
 
 class MPservice(object):
-    def __init__(self,commandQ=None, broadcastQ=None):
-        self.commandQ   = commandQ
+    def __init__(self, commandQ=None, broadcastQ=None):
+        self.commandQ = commandQ
         self.broadcastQ = broadcastQ
         # self.mpu       = robdrivers.mpu9150rpi.MPU9150_A()
         self.mpu = MPU_CLASS()
@@ -94,7 +94,7 @@ class MPservice(object):
                     'successfulReadings':0, 'badReadings':0}
 
         lastWaitStart = 0
-        gyroReading = gyro(0,0,0,self.curtime)
+        gyroReading = gyro(0, 0, 0, self.curtime)
             
         while True:
             loopStartTime = robtimer()
@@ -102,7 +102,7 @@ class MPservice(object):
 
             mpuReading = self.mpu.read()
             gyroReading = mpuReading.gyro
-            #logging.debug("%s",(str(mpuReading),))
+            # logging.debug("%s",(str(mpuReading),))
             
             if gyroReading.z != None :
                 opsStats['successfulReadings'] += 1
@@ -110,7 +110,7 @@ class MPservice(object):
                     self.broadcastQ.put(mpuReading)
                     self.lastMpuReportTime = robtimer()
             else:
-                opsStats['badReadings'] +=1
+                opsStats['badReadings'] += 1
             
             if not self.commandQ.empty():
                 task = self.commandQ.get_nowait()
@@ -138,7 +138,7 @@ class MPservice(object):
         self.end()
 
         
-    def genericSubscriber(self,msg):
+    def genericSubscriber(self, msg):
         if self.lastLogTime == 0:
             logging.debug('\n\n%s: Initiating motion processing logging.' %\
                           (time.asctime(),))

@@ -22,6 +22,8 @@ __version__ = "1.0"
 import sqlite3
 from collections import namedtuple
 
+from pyquaternion import Quaternion
+
 from lbrsys.settings import dbfile, robot_name
 from lbrsys.robdrivers.calibration import Calibration, CalibrationSetting
 
@@ -36,7 +38,16 @@ batlevel    = namedtuple('batlevel','voltage level source')
 gyro        = namedtuple('gyro',     'x y z t')
 accel       = namedtuple('accel',   'x y z')
 mag         = namedtuple('mag',   'x y z')
-mpuData     = namedtuple('mpuData', 'gyro accel mag heading temp time')
+# quat        = namedtuple('quat', 'w x y z')  # json serializable representation of Quaternion
+mpuData     = namedtuple('mpuData', 'gyro accel mag heading temp time quat qangle',
+                         defaults=((0., 0., 0., 0.),
+                                   (0., 0., 0.),
+                                   (0., 0., 0.),
+                                   0., 0., 0.,
+                                   # (1., 0., 0., 0.),  # use this if sending quaternions as tuple
+                                   Quaternion(),
+                                   0.))
+
 euler       = namedtuple('euler', 'roll pitch yaw')
 
 observeTurn = namedtuple('observeTurn', 'angle')

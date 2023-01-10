@@ -43,6 +43,8 @@ import logging
 import multiprocessing
 import threading
 
+from pyquaternion import Quaternion
+
 from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL
 from lbrsys import feedback
 
@@ -147,7 +149,6 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
             if type(msg) is feedback:  # todo - reexamine and look at voltages
                 if type(msg.info) is dict:
                     for k, v in msg.info.items():
-
                         # for dockSignal updates, only replace the part of the telemetry
                         #   provided by the current feedback message
                         #   and note the time of the 1 signals to facilitate state /
@@ -238,7 +239,7 @@ class RobHandler(BaseHTTPRequestHandler):
         # for now, always send telemetry
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        buffer = json.dumps(self.server.currentTelemetry).encode()
+        buffer = json.dumps(self.server.currentTelemetry, default=str).encode()
         self.wfile.write(buffer)
 
         if self.server.motors_powered > 0:
@@ -259,7 +260,7 @@ class RobHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        buffer = json.dumps(self.server.currentTelemetry).encode()
+        buffer = json.dumps(self.server.currentTelemetry, default=str).encode()
         # json.dump(buffer, self.wfile)
         self.wfile.write(buffer)
 

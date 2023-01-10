@@ -305,7 +305,7 @@ class Robot(object):
         if type(cmd) is str and cmd[0] != '/':
             cmdWords = cmd.split(' ')
             if len(cmdWords) == 1 and cmdWords[0].lower() == 'stop':
-                preparedCommand = power(0,0)
+                preparedCommand = power(0, 0)
                 return preparedCommand
 
             if len(cmdWords) == 2 and cmdWords[0].lower() == 'stop':

@@ -100,16 +100,16 @@ class Opsmgr(object):
         self.ampsInterval       = 1
         self.lastAmps           = amperages(0, 0, "")
         self.rangeRules         = opsrules.RangeRules()
-        self.adjustedTask       = power(0.,0.)
-        self.lastPower          = power(0.,0.)
-        self.autoAdjust         = True # False means don't adjust for range
+        self.adjustedTask       = power(0., 0.)
+        self.lastPower          = power(0., 0.)
+        self.autoAdjust         = True  # False means don't adjust for range
 
         self.lastRanges         = {'Ranges':{'Forward':0,'Left':0,'Right':0,
                                              'Bottom':0,'Back':0,'Deltat':0},
                                    'Timestamp':0.0}
 
-        self.lastMpu            = mpuData(gyro(0,0,0,0), accel(0,0,0), mag(0,0,0),
-                                          0, 0, 0) # todo convert to json
+        self.lastMpu            = mpuData(gyro(0, 0, 0, 0), accel(0, 0, 0), mag(0, 0, 0),
+                                          0, 0, 0)
         self.curHeading         = 0
 
         self.lastMpuTime        = 0
@@ -136,11 +136,11 @@ class Opsmgr(object):
 
         
     def checkController(self):
-        v,a = self.motorController.checkController()
+        v, a = self.motorController.checkController()
         # v,a = self.motorController.cFront.checkController()
-        #results published by the controller. return values mainly for unit testing
+        # results published by the controller. return values mainly for unit testing
 
-    def execTask(self,task):
+    def execTask(self, task):
         logging.debug(f"executing ops task: {str(task)}")
         logging.debug(f"\ttype of task is {type(task)}")
         if printTests:
@@ -152,7 +152,7 @@ class Opsmgr(object):
             result = "no move result"
             if self.autoAdjust:
                 self.adjustedTask = self.rangeRules.adjustPower(
-                    self.requestedPower,self.lastPower,self.forwardRange)
+                    self.requestedPower, self.lastPower, self.forwardRange)
                 if printTests:
                     print(("adjusted task: %s" % str(self.adjustedTask)))
                 result = self.mover.movepa(self.adjustedTask)
@@ -242,7 +242,6 @@ class Opsmgr(object):
                 print("adjust - level: %.2f, range: %d" % \
                 (self.adjustedTask.level,self.forwardRange))
 
-        
     def processStats(self,opsStats):
         opsStats['AverageLoopTime'] = opsStats['totalLoopTime']/opsStats['numLoops']
         if opsStats['numWaits'] > 0:

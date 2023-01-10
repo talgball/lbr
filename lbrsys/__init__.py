@@ -66,6 +66,7 @@ motorCommandResult = namedtuple('motorCommandResult',
 dance       = namedtuple('dance', 'song')
 speech      = namedtuple('speech','msg save', defaults=('',))
 feedback    = namedtuple('feedback','info')
+exec_report = namedtuple('exec_report', 'name info', defaults=('telemetry', {}))
 screen      = namedtuple('screen', 'power')
 iot         = namedtuple('iot', 'msg')
 
@@ -81,7 +82,7 @@ channelMap = {
         calibrateMagnetometer,
     },
     'Speech': {speech},
-    'Application': {feedback, dict},
+    'Application': {feedback, exec_report, dict},
     'Dance': {dance},
     'IoT': {iot},
 }
@@ -100,6 +101,7 @@ command_map = {
     's': {2: {speech: [str]}, 3:{speech: [str, str]}},
     'd': {2: {dance: [str]}},
     'm': {3: {calibrateMagnetometer: [int, str]}},
+    'report': {2: {exec_report: [str]}},
 }
 
 

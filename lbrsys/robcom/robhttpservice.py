@@ -46,7 +46,7 @@ import threading
 from pyquaternion import Quaternion
 
 from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL
-from lbrsys import feedback
+from lbrsys import feedback, exec_report
 
 from lbrsys.robcom import robauth
 
@@ -80,7 +80,6 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
 
         self.set_security_mode()
 
-
     def check_dockSignal(self):
         '''Monitor time to live for docksignals.  Todo - generalize for any signals needing ttl'''
         for signal in ['left', 'right']:
@@ -99,7 +98,6 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
 
         return
 
-
     def set_security_mode(self):
         try:
             if USE_SSL:
@@ -112,14 +110,12 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
         except Exception as e:
             logging.error("Exception securing http server: {}".format(str(e)))
 
-
     # todo simplify heartbeat management using threading.Timer
     def set_heartbeat(self):
         if self.motors_powered > 0 and not self.heartbeat:
             self.heartbeat_thread = threading.Thread(target=self.check_heartbeat)
             self.heartbeat_thread.start()
             self.heartbeat = True
-
 
     def check_heartbeat(self, pulse=2.0):
         time.sleep(pulse)
@@ -133,7 +129,6 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
             # print('\ttelemetry age: %.3f' % (time.time() - self.telemetry_sent))
             self.set_heartbeat()
 
-
     def updateTelemetry(self):
         """Telemetry updater - run in a separate thread."""
         while True:
@@ -145,6 +140,18 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
             self.receiveQ.task_done()
             if msg == "Shutdown":
                 break
+
+            # exec_report is a request from the robot executive to retrieve an update,
+            #   typically on telemetry
+            if type(msg) is exec_report:
+                print(f"Processing an executive report request for {msg.name}")
+                if msg.name == 'telemetry':
+                    response = exec_report('telemetry', self.currentTelemetry)
+                else:
+                    response = exec_report(msg.name, f"No information available on {msg.name}.")
+
+                self.sendQ.put(response)
+                continue
 
             if type(msg) is feedback:  # todo - reexamine and look at voltages
                 if type(msg.info) is dict:
@@ -267,14 +274,12 @@ class RobHandler(BaseHTTPRequestHandler):
         self.server.telemetry_sent = time.time()
         # print("GET path: %s" % self.path)
 
-
     def handle_docksignal(self, msgD):
         self.server.receiveQ.put(feedback(msgD))
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         return
-
 
     def handle_say_noreply(self, msgD):
         try:
@@ -291,14 +296,12 @@ class RobHandler(BaseHTTPRequestHandler):
         self.server.sendQ.put(speech_command)
         return
 
-
     def handle_say(self, msgD):
         self.handle_say_noreply(msgD)
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         return
-
 
     def handle_wakeup(self, msgD):
         self.send_response(204)
@@ -310,7 +313,6 @@ class RobHandler(BaseHTTPRequestHandler):
         print(msg)
 
         return
-
 
     def is_user_authorized(self):
         try:
@@ -326,7 +328,6 @@ class RobHandler(BaseHTTPRequestHandler):
                          (str(self.headers), str(e)))
             return False
 
-
     def do_OPTIONS(self):
         """" Setup to support ajax queries from client"""
         # print("Headers: %s" % str(self.headers))
@@ -337,7 +338,6 @@ class RobHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'X-Requested-With, Content-type, User, Authorization')
         self.end_headers()
         return
-
 
     def do_GET(self):
         if self.path.startswith('/validate'):
@@ -368,7 +368,6 @@ class RobHandler(BaseHTTPRequestHandler):
         self.wfile.write(b'Service not available.\r\n')
 
         return
-
 
     def do_POST(self):
         """

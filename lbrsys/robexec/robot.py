@@ -29,7 +29,7 @@ import multiprocessing
 import subprocess
 import threading
 import time
-
+import pprint
 
 # setting the path here so that robot.py can be 
 #    executed interactively from here Shutdown
@@ -46,7 +46,7 @@ except:
 
 from lbrsys import power, nav
 from lbrsys import observeTurn, executeTurn, executeHeading, calibrateMagnetometer
-from lbrsys import speech, dance, feedback
+from lbrsys import speech, dance, feedback, exec_report
 from lbrsys import channelMap, command_map
 
 # These imports support dynamically launching robot processes during setup
@@ -161,7 +161,6 @@ class Robot(object):
                 #pprint.pprint(c)
         pass # useful breakpoint to examine robot configuration data in debugger
 
-                      
     def start(self):
         self.r.noteStarted()
 
@@ -183,7 +182,6 @@ class Robot(object):
             self.execExt('navcam')
 
         self.mainEmbodied()
-
 
     def mainEmbodied(self):
         while True:
@@ -227,7 +225,6 @@ class Robot(object):
                         
         self.end()
 
-
     def execExt(self, command):
         logging.info("Robot Exec: Processing external command - {}".format(str(command)))
         cmd = self.r.extcmds[command]
@@ -253,7 +250,6 @@ class Robot(object):
 
         return result
 
-
     def execSend(self, preparedCommand):
         logging.debug("Robot Exec: Processing - {}".format(str(preparedCommand)))
         #
@@ -268,12 +264,18 @@ class Robot(object):
                     c[0].put(preparedCommand)
                     # print(f"put {preparedCommand} in {str(c[0])}, {c[1]['description']}")
 
-
     def monitor(self,monitorQ):
         while True:
             msg = monitorQ.get()
             # print "msg: %s" % (str(msg),)
             if msg:
+                # Executive Report here is a response to a request for information,
+                #   as opposed to a command to be further dispatched by default.
+                if type(msg) is exec_report:
+                    pprint.pp(f"Executive Report on {msg.name}: {str(msg.info)}", indent=4)
+                    monitorQ.task_done()
+                    continue
+
                 #preparedCommand = self.prepare(str(msg))
                 preparedCommand = self.prepare(msg)
                 logging.debug("Robot-{0}:\n\t{1}".format(
@@ -301,7 +303,7 @@ class Robot(object):
             return preparedCommand
         
         logging.debug("type of cmd '%s' is: %s" % (str(cmd),type(cmd)))
-        
+
         if type(cmd) is str and cmd[0] != '/':
             cmdWords = cmd.split(' ')
             if len(cmdWords) == 1 and cmdWords[0].lower() == 'stop':
@@ -367,8 +369,7 @@ class Robot(object):
 
         else:
             preparedCommand = feedback(cmd)
-            # print(f"feedback: {str(cmd)}")
-            
+
         return preparedCommand
             
 

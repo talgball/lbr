@@ -56,7 +56,7 @@ Z_Convention = -1 # Z - clockwise and up are negative (e.g., gravity is down)
 jitsiURL = "https://meet.jit.si/bfrobotics"
 
 # uncomment the following line to automatically start the navigation camera
-LAUNCH_NAVCAM = False
+LAUNCH_NAVCAM = True
 
 # Set SPEECH_SERVICE = 'native' for a pyttsx3 based implementation or 'aws_polly' for cloud based speech
 SPEECH_SERVICE = 'aws_polly'

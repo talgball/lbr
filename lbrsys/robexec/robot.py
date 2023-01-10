@@ -61,7 +61,7 @@ import robapps
 import robapps.iot
 import robapps.iot.robiot
 
-from robexec import robconfig
+from lbrsys.robexec import robconfig
 
 # Convention for interpreting queue setup configuration data
 QueueNotShared = -1
@@ -229,7 +229,7 @@ class Robot(object):
 
 
     def execExt(self, command):
-        logging.debug("Robot Exec: Processing external command - {}".format(str(command)))
+        logging.info("Robot Exec: Processing external command - {}".format(str(command)))
         cmd = self.r.extcmds[command]
         if cmd['blocking']:
             run = subprocess.run
@@ -388,7 +388,7 @@ class Robot(object):
         print("Terminating external processes")
         for p in self.extProcesses.values():
             p.terminate()
-            p.wait(0.2)
+            p.wait(0.4)
 
         '''
         # todo: debug why the queues (especially #2) hangs

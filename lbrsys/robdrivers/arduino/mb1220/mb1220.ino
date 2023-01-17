@@ -47,6 +47,9 @@ Sensor sensors[NUMBER_OF_SENSORS] = {
 };
 
 long deltat = 0;
+int control = 0;
+int received = 0;
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -73,23 +76,45 @@ void loop() {
   int i;
   long tnow = 0;
 
-  tnow = millis();
-  
-  for(i=0; i<NUMBER_OF_SENSORS; i++) {
-    
-    if(sensors[i].ctrlPin == 0){
-      continue;
+  if (Serial.available() > 0) {
+    received = Serial.read();
+    Serial.print("received: ");
+    Serial.print((char)received);
+    Serial.print("\n");
+
+    if ((char)received == 'g') {
+      control = 1;
+      received = 0;
+    }
+
+    if ((char)received == 's') {
+      control = 0;
+      received = 0; 
     }
     
-    sensors[i].distance = get_distance(&sensors[i]);
-    delay(100); // not needed after we install the rest of the sensors
   }
 
-  report_sensors(sensors, deltat);
-
-  delay(50);
-  deltat = millis() - tnow;
+  if (control == 1) {
+   
+    tnow = millis();
+    
+    for (i=0; i<NUMBER_OF_SENSORS; i++) {
+      
+      if (sensors[i].ctrlPin == 0) {
+        continue;
+      }
+      
+      sensors[i].distance = get_distance(&sensors[i]);
+      delay(100); // not needed after we install the rest of the sensors
+    }
+  
+    report_sensors(sensors, deltat);
+  
+    delay(50);
+    deltat = millis() - tnow;
+  }
 }
+
 
 unsigned long get_distance(Sensor *s) {
   
@@ -106,6 +131,7 @@ unsigned long get_distance(Sensor *s) {
  
   return(s->distance);
 }
+
 
 void report_sensors(Sensor *ss, long delta) {
   int i;

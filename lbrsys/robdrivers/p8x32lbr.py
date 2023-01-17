@@ -41,7 +41,7 @@ from collections import deque
 import serial
 
 from lbrsys.settings import P8X32_1_Port
-from robcom import publisher
+from lbrsys.robcom import publisher
 
 testMovement = False
 
@@ -73,6 +73,10 @@ class P8X32:
         self.qDepth     = 500  # number of range readings to keep
         self.rangeList  = deque(maxlen=self.qDepth)
         self.t0         = time.time()
+
+        # Enable ranging - Introduced for lbr6, where arduino is controlling ranging.
+        #  todo Needs testing on lbr2a, where parallax controller does not range if port not open)
+        self.controller.write("g\n".encode())
 
     def flush(self):
         self.controller.flushInput()
@@ -107,6 +111,7 @@ class P8X32:
         return goodRead, self.ranges
 
     def close(self):
+        self.controller.write("s\n".encode())
         self.controller.close()
     
 

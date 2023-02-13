@@ -39,10 +39,10 @@ typedef struct Sensor {
 }Sensor;
 
 Sensor sensors[NUMBER_OF_SENSORS] = {
-  {.name="Forward", .ctrlPin=12, .pingPin=13, .distance=50},
-  {.name="Left",    .ctrlPin=0,  .pingPin=8, .distance=40},
-  {.name="Right",   .ctrlPin=0,  .pingPin=4, .distance=30},
-  {.name="Back",    .ctrlPin=0,  .pingPin=4, .distance=20},
+  {.name="Forward", .ctrlPin=6,  .pingPin=7, .distance=50},  
+  {.name="Left",    .ctrlPin=12, .pingPin=13, .distance=40},
+  {.name="Right",   .ctrlPin=4,  .pingPin=5, .distance=30},
+  {.name="Back",    .ctrlPin=10, .pingPin=11, .distance=20},
   {.name="Bottom",  .ctrlPin=0,  .pingPin=0, .distance=10},
 };
 
@@ -105,7 +105,7 @@ void loop() {
       }
       
       sensors[i].distance = get_distance(&sensors[i]);
-      delay(100); // not needed after we install the rest of the sensors
+      // delay(100); // not needed after we install the rest of the sensors
     }
   
     report_sensors(sensors, deltat);

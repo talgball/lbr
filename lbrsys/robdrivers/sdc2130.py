@@ -40,7 +40,7 @@ from serial import EIGHTBITS, PARITY_NONE, STOPBITS_ONE
 sys.path.insert(0, '..')
 
 from lbrsys.settings import SDC2130_Port
-from lbrsys import voltages, amperages, motorCommandResult
+from lbrsys import voltages, amperages, count, motorCommandResult
 from robcom import publisher
 
 
@@ -70,14 +70,14 @@ class SDC2130:
             raise
         
         self.motorCommand = self.STOP_MOTOR_COMMAND
-        self.messagePub = publisher.Publisher("SDC2130 Message Publisher")
-        self.voltagePub = publisher.Publisher("SDC2130 Voltage Publisher")
-        self.ampsPub    = publisher.Publisher("SDC2130 Amperage Publisher")
-        self.motorControlPub = publisher.Publisher("SDC2130 Motor Control Publisher")
+        self.messagePub = publisher.Publisher("SDC21xx Message Publisher")
+        self.voltagePub = publisher.Publisher("SDC21xx Voltage Publisher")
+        self.ampsPub    = publisher.Publisher("SDC21xx Amperage Publisher")
+        self.motorControlPub = publisher.Publisher("SDC21xx Motor Control Publisher")
+        self.count_pub = publisher.Publisher("SDC21xx Encoder Count Publisher")
 
         self.lastVoltages = voltages(12.0, 12.0, 5.11, time.asctime())
-        # self.lastVoltages = voltages(0.,0.,0.,time.asctime())
-
+        self.last_count = count(0, 0, time.time())
     
     def closeController(self):
         try:
@@ -109,7 +109,46 @@ class SDC2130:
             values = [-999., -999.]
             
         return tuple(values)
-                
+
+    def get_count(self):
+        """Retrieve sdc2160 encoder counts (added 20230212)"""
+        readBuffer = b''
+        try:
+            # self.controller.flush()
+            self.controller.write(b'?C\r')  # query for the voltages'
+            self.controller.flush()
+
+            # read the good echo, then the result
+            readBuffer = self.controller.read_until(b'?C\r')
+            if readBuffer == b'?C\r':
+                readBuffer = self.controller.read_until(b'\r')
+            else:
+                print(f"Expected readBuffer '?C\r', got '{readBuffer}'")
+                readBuffer = b''
+
+        except:
+            msg = time.asctime() + ' Error getting count'
+            self.messagePub.publish(msg)
+            print(msg)
+
+        readings = ()
+        if len(readBuffer) > 3:
+            readings = self.parseQueryResults(readBuffer, 'C')
+        else:
+            # print "Skipped bad readBuffer in get_count"
+            pass
+
+        if len(readings) == 2:
+            left = int(readings[0])
+            right = int(readings[1])
+            c = count(left, right, time.time())
+            self.last_count = c
+        else:
+            c = self.last_count
+
+        self.count_pub.publish(c)
+
+        return c
 
     def getVoltages(self):
         """
@@ -334,6 +373,7 @@ class SDC2130:
         """
         v = self.getVoltages()
         a = self.getAmps()
+        c = self.get_count()
 
         # for now, just re-issue the current motor command
         # could flash an led or take any other runtime action
@@ -341,7 +381,7 @@ class SDC2130:
         if self.motorCommand != self.STOP_MOTOR_COMMAND:
             self.mixMotorCommand(0, 0, motorCommand=self.motorCommand)
 
-        return v,a
+        return v, a, c
         # todo - add power, etc.
 
 

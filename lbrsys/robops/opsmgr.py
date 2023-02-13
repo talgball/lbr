@@ -30,7 +30,7 @@ import multiprocessing
 import threading
 
 from lbrsys.settings import opsLogFile
-from lbrsys import power, nav, voltages, amperages
+from lbrsys import power, nav, voltages, amperages, count
 from lbrsys import gyro, accel, mag, mpuData
 from lbrsys import observeTurn, executeTurn, observeHeading, executeHeading
 from lbrsys import calibrateMagnetometer
@@ -99,6 +99,7 @@ class Opsmgr(object):
         self.lastAmpsTime       = 0
         self.ampsInterval       = 1
         self.lastAmps           = amperages(0, 0, "")
+        self.last_count         = count(0, 0, 0.)
         self.rangeRules         = opsrules.RangeRules()
         self.adjustedTask       = power(0., 0.)
         self.lastPower          = power(0., 0.)
@@ -130,14 +131,14 @@ class Opsmgr(object):
         self.motorController.voltagePub.addSubscriber(self.genericSubscriber)
         self.motorController.voltagePub.addSubscriber(self.voltageMonitor)
         self.motorController.voltagePub.addSubscriber(self.reportBat)
+        self.motorController.count_pub.addSubscriber(self.report_count)
         self.motorController.ampsPub.addSubscriber(self.genericSubscriber)
         self.motorController.ampsPub.addSubscriber(self.reportAmps)
         self.motorController.motorControlPub.addSubscriber(self.genericSubscriber)
 
         
     def checkController(self):
-        v, a = self.motorController.checkController()
-        # v,a = self.motorController.cFront.checkController()
+        v, a, c = self.motorController.checkController()
         # results published by the controller. return values mainly for unit testing
 
     def execTask(self, task):
@@ -271,6 +272,13 @@ class Opsmgr(object):
                 self.broadcastQ.put(vdictj)
                 self.lastVoltageAlarm = robtimer()
 
+    def report_count(self, c):
+        if c.left != self.last_count.left or c.right != self.last_count.right:
+            self.last_count = c
+            count_dict = {'Count': {'left': c.left, 'right': c.right, 'time': c.time}}
+            self.broadcastQ.put(count_dict)
+            logging.debug(str(count_dict))
+
     def reportBat(self, v):
         if robtimer() - self.lastVoltageTime >= self.voltageInterval:
             if abs(v.mainBattery-self.lastVoltage.mainBattery) > self.voltageNoise:
@@ -296,7 +304,7 @@ class Opsmgr(object):
             logging.debug('Amperages: %s\n' % (str(a)))
 
 
-    def reportRange(self,info):
+    def reportRange(self, info):
         '''
         example
         {u'Ranges': {u'Right': 55, u'Deltat': 12313264, u'Bottom': -1, u'Back': 18, u'Forward': 67, u'Left': 18},

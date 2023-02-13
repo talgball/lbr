@@ -58,6 +58,15 @@ executeHeading = namedtuple('executeHeading', 'heading')
 observeRange = namedtuple('observeRange', 'nav')
 calibrateMagnetometer = namedtuple('calibrateMagnetometer', 'samples source')
 mag_corrections = namedtuple('mag_corrections', 'alpha beta xform0, xform1, xform2, xform3')
+move_config = namedtuple('move_config', [
+                           'wheel_diameter',
+                           'counts_per_rev',
+                           'm1_direction',
+                           'm2_direction',
+                           'm3_direction',
+                           'm4_direction'],
+                           defaults=(17.78, 130, -1, 1, 0, 0)
+                           )
 
 distance    = namedtuple('distance', 'n s e w t')
 
@@ -124,5 +133,29 @@ def get_robot_id(name):
 
 
 robot_id = get_robot_id(robot_name)
+
+
+def get_move_config(robot_id):
+    robot_move_config = move_config()
+    try:
+        with sqlite3.connect(dbfile) as con:
+            con.row_factory = sqlite3.Row
+            cursor = con.cursor()
+            config_rec = cursor.execute(
+                "SELECT * FROM move_config \
+                WHERE move_config.robot_id=?", (robot_id,))
+            config_record = config_rec.fetchone()
+        robot_move_config = move_config(float(config_record['wheel_diameter']),
+                                        int(config_record['counts_per_rev']),
+                                        int(config_record['m1_direction']),
+                                        int(config_record['m2_direction']), 0, 0)
+    except Exception as e:
+        print(f"Error getting move configuration for robot {robot_name}: {e}")
+
+    return robot_move_config
+
+
+robot_move_config = get_move_config(robot_id)
+# print(f"Move Configuration: {str(robot_move_config)}")
 
 robot_calibrations = Calibration()

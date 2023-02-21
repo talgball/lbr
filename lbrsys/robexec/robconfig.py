@@ -1,8 +1,8 @@
 """
 robconfig.py - configure robot and manage config data
-    Manage the itnerface between the robot and a sqlite3
+    Manage the interface between the robot and a sqlite3
     database describing key attributes, including the
-    connections between robot subsytems.
+    connections between robot subsystems.
 """
 
 __author__ = "Tal G. Ball"
@@ -129,7 +129,7 @@ class Robconfig:
         try:
             self.cursor.execute(
                 "UPDATE robot \
-                SET last_start_time=DATETIME('now','localtime') \
+                SET last_start_time=DATETIME('now', 'localtime') \
                 WHERE name=?",
                 (self.name,))
             self.con.commit()
@@ -141,7 +141,7 @@ class Robconfig:
         try:
             self.cursor.execute(
                 "UPDATE robot \
-                SET last_shutdown_time=DATETIME('now','localtime') \
+                SET last_shutdown_time=DATETIME('now', 'localtime') \
                 WHERE name=?",
                 (self.name,))
             self.con.commit()

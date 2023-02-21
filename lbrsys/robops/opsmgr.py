@@ -100,6 +100,7 @@ class Opsmgr(object):
         self.ampsInterval       = 1
         self.lastAmps           = amperages(0, 0, "")
         self.last_count         = count(0, 0, 0.)
+        self.first_count_reported = False
         self.rangeRules         = opsrules.RangeRules()
         self.adjustedTask       = power(0., 0.)
         self.lastPower          = power(0., 0.)
@@ -273,11 +274,13 @@ class Opsmgr(object):
                 self.lastVoltageAlarm = robtimer()
 
     def report_count(self, c):
-        if c.left != self.last_count.left or c.right != self.last_count.right:
+        if not self.first_count_reported or \
+                c.left != self.last_count.left or c.right != self.last_count.right:
             self.last_count = c
             count_dict = {'Count': {'left': c.left, 'right': c.right, 'time': c.time}}
             self.broadcastQ.put(count_dict)
             logging.debug(str(count_dict))
+            self.first_count_reported = True
 
     def reportBat(self, v):
         if robtimer() - self.lastVoltageTime >= self.voltageInterval:

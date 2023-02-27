@@ -53,6 +53,7 @@ from lbrsys import channelMap, command_map
 import robcom
 import robcom.robhttpservice
 import robcom.speechsrvcs
+import robcom.robcamservice
 import robops
 import robops.opsmgr
 import robops.mpops

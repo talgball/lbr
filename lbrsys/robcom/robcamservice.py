@@ -63,8 +63,9 @@ sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.insert(3, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
+from lbrsys import select_camera
 from lbrsys.settings import robcamLogFile, USE_SSL, CAMERAS
-USE_SSL = False
+# USE_SSL = False
 from lbrsys.robdrivers import camera
 
 
@@ -241,11 +242,11 @@ def start_service(commandq, broadcastq):
             commandq.task_done()
             break
 
-        if task in CAMERAS:
+        if type(task) is select_camera and task.name in CAMERAS:
             current_camera.stop_recording()
             current_camera.close()
 
-            current_camera = config_camera(task)
+            current_camera = config_camera(task.name)
             current_camera.start_recording(output, format='mjpeg')
             commandq.task_done()
 
@@ -261,10 +262,11 @@ if __name__ == '__main__':
 
     while True:
         cmd = input("> ")
-        cq.put(cmd)
         if cmd == "Shutdown":
-            time.sleep(0.5)
+            cq.put(cmd)
             break
+        else:
+            cq.put(select_camera(cmd))
 
     # todo add joining instead of terminate
     service.terminate()

@@ -81,7 +81,7 @@ tokenFile = os.path.join(os.path.join(os.environ['ROBOT_CRED'], 'robauth.tokens'
 AUDIO_DIR = os.path.join(BASE_DIR, 'media', 'audio')
 
 # camera list
-CAMERAS = OrderedDict({'Forward': {'device': '/dev/video0'},
+CAMERAS = OrderedDict({'Front': {'device': '/dev/video0'},
            'Rear': {'device': '/dev/video2'},
             })
 

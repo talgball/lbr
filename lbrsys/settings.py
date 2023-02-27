@@ -5,6 +5,7 @@ specific ports and configuration options
 
 import os
 import socket
+from collections import OrderedDict
 
 
 robot_name = 'lbr6'
@@ -79,6 +80,11 @@ tokenFile = os.path.join(os.path.join(os.environ['ROBOT_CRED'], 'robauth.tokens'
 # audio directory
 AUDIO_DIR = os.path.join(BASE_DIR, 'media', 'audio')
 
+# camera list
+CAMERAS = OrderedDict({'Forward': {'device': '/dev/video0'},
+           'Rear': {'device': '/dev/video2'},
+            })
+
 # log directory and file configuration
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 
@@ -97,6 +103,7 @@ speechLogFile  = os.path.join(LOG_DIR, 'speech.log')
 iotLogFile     = os.path.join(LOG_DIR, 'iot.log')
 rangeobserverLogFile = os.path.join(LOG_DIR, 'rangeobserver.log')
 headingobserverLogFile = os.path.join(LOG_DIR, 'headingobserver.log')
+robcamLogFile = os.path.join(LOG_DIR, 'camera.log')
 
 magCalibrationLogFile = os.path.join(MAG_CALIBRATION_DIR,
                                      "{today}-mag-0-raw-calibration-data.csv")

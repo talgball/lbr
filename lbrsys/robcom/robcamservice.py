@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-navcam - Experimental module to stream pycamera for use in robot navigation
+robcamservice - Experimental module to stream pycamera for use in robot navigation
     Code drawn from example in official picamera package
     http://picamera.readthedocs.io/en/latest/recipes2.html#web-streaming
     Modified by Tal G. Ball starting on December 12, 2018
@@ -8,11 +8,14 @@ navcam - Experimental module to stream pycamera for use in robot navigation
     Further modifications by Tal G. Ball, starting on December 6, 2022 to create a v4l2 compatible version
     This version drops support for picamera for now, with the intention of merging the two
     approaches into one module as a later step.
+
+    Tal G. Ball - February 26, 2023 - Initiated elevation of navcam to robcamservice, a more generalized
+    camera management service.
 """
 
 
-__author__ = "Dave Jones"
-__copyright__ = "Copyright 2013 - 2017, Dave Jones"
+__author__ = "Dave Jones and Tal G. Ball"
+__copyright__ = "Copyright 2013 - 2017, Dave Jones and 2018 - 2023, Tal G. Ball"
 __license__ = "BSD 3"
 __version__ = "1.0"
 
@@ -50,6 +53,9 @@ import socketserver
 import ssl
 from threading import Condition
 from http import server
+import multiprocessing
+import threading
+import time
 
 from codetiming import Timer
 
@@ -57,8 +63,16 @@ sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.insert(3, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL
+from lbrsys.settings import robcamLogFile, USE_SSL, CAMERAS
+USE_SSL = False
 from lbrsys.robdrivers import camera
+
+
+proc = multiprocessing.current_process()
+
+if proc.name == "Robot Camera Service" :
+    logging.basicConfig (level=logging.DEBUG,filename = robcamLogFile,
+                        format='[%(levelname)s] (%(processName)-10s) %(message)s',)
 
 
 PAGE="""\
@@ -162,29 +176,99 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
         try:
             return super().serve_forever(**kwargs)
         except KeyboardInterrupt:
-            print(f"Exiting navcam on keyboard interrupt.")
+            print(f"Exiting camera service on keyboard interrupt.")
 
+
+output = StreamingOutput()
+
+def config_camera(camera_name):
+    cam = None
+    try:
+        cam = camera.UVCCamera(device=CAMERAS[camera_name]['device'],
+                               resolution='640x360',
+                               framerate=15).config_camera()
+    except Exception as e:
+        msg = f"Exception configuring camera: {str(camera_name)} - {e}"
+        logging.debug(msg)
+        print(msg)
+
+    return cam
+
+
+def start_service(commandq, broadcastq):
+
+    # setup default camera
+    default_camera_started = False
+
+    c = None
+    current_camera = None
+
+    try:
+        for c in CAMERAS:
+            current_camera = config_camera(c)
+
+            if not default_camera_started:
+                # current_camera = CAMERAS[c]['camera']
+                current_camera.start_recording(output, format='mjpeg')
+                default_camera_started = True
+                break # for now, only setup one camera at a time until ready for reusue.
+                # todo make camera safe for reuse instead of having to rebuild
+
+    except Exception as e:
+        msg = f"Exception starting camera: {str(c)} - {e}"
+        logging.debug(msg)
+        print(msg)
+
+    try:
+        address = ('', 9146)
+        server = StreamingServer(address, StreamingHandler)
+
+        streaming_thread = threading.Thread(target=server.serve_forever, name="CameraStreamingThread")
+        logging.debug("Starting Camera Streaming.")
+        streaming_thread.start()
+    except Exception as e:
+        msg = f"Exception Starting Camera Streaming thread: {str(current_camera)} - {e}"
+        current_camera.stop_recording()
+        logging.debug(msg)
+        print(msg)
+
+    while True:
+        task = commandq.get()
+
+        if task == "Shutdown":
+            current_camera.stop_recording()
+            current_camera.close()
+            commandq.task_done()
+            break
+
+        if task in CAMERAS:
+            current_camera.stop_recording()
+            current_camera.close()
+
+            current_camera = config_camera(task)
+            current_camera.start_recording(output, format='mjpeg')
+            commandq.task_done()
+
+    # streaming_thread.join()  # no current termination except KeyboardInterrupt
 
 
 if __name__ == '__main__':
-    # with picamera.PiCamera(resolution='1920x1080', framerate=24) as camera:
-    # with camera.UVCCamera(resolution='1920x1080', framerate=30) as camera:
-    # 1920x1080 was working, albeit laggy on Dec 8, 2022. Camera now fails
-    #   to be readable at that setting
-    # defaulting to 640x360 at 15fps based on available measured performance
-    with camera.UVCCamera(device='/dev/video0', resolution='640x360', framerate=15) as camera:
-    # with camera.UVCamera(device='/dev/video2', resolution='640x360', framerate=30, memory='USERPTR') as camera:
+    cq = multiprocessing.JoinableQueue()
+    bq = multiprocessing.JoinableQueue()
 
-        output = StreamingOutput()
+    service = multiprocessing.Process(target=start_service, args=(cq, bq))
+    service.start()
 
-        #Uncomment the next line to change your Pi's Camera rotation (in degrees)
-        # camera.rotation = 180
+    while True:
+        cmd = input("> ")
+        cq.put(cmd)
+        if cmd == "Shutdown":
+            time.sleep(0.5)
+            break
 
-        camera.start_recording(output, format='mjpeg')
+    # todo add joining instead of terminate
+    service.terminate()
+    print("Done.")
 
-        try:
-            address = ('', 9146)
-            server = StreamingServer(address, StreamingHandler)
-            server.serve_forever()
-        finally:
-            camera.stop_recording()
+
+

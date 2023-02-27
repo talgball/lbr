@@ -43,14 +43,12 @@ class UVCCamera(object):
     def __init__(self, device='/dev/video0', video_format='mjpeg',
                  # resolution='1280x720', framerate=30, memory='USERPTR',
                  # resolution='1920x1080', framerate=30, memory='USERPTR',
-                 resolution='640x360', framerate=24, memory='USERPTR',
-                 latency_timer=None):
+                 resolution='640x360', framerate=24, memory='USERPTR'):
         self.device = device
         self.video_format = video_format
         self.width, self.height = [int(r) for r in resolution.split('x')]
         self.framerate = framerate
         self.memory = memory  # 'USERPTR' or 'MMAP'
-        self.latency_timer = latency_timer
         self.vd = None
         self.cp = None
         self.fmt = None
@@ -66,17 +64,20 @@ class UVCCamera(object):
         self.buf.memory = V4L2_MEMORY_USERPTR
         self.buf_type = v4l2_buf_type(V4L2_BUF_TYPE_VIDEO_CAPTURE)
         self.frames_read = 0
-        self.frame_timer = Timer(name="Frame", logger=None)
-        self.frame_acq_timer = Timer(name="FrameAcquisition", logger=None)
-        self.frame_write_timer = Timer(name="FrameWrite", logger=None)
-        self.select_timer = Timer(name="Select", logger=None)
-        self.mm_read_timer = Timer(name="MMRead", logger=None)
+        # self.frame_timer = Timer(name="Frame", logger=None)
+        # self.frame_acq_timer = Timer(name="FrameAcquisition", logger=None)
+        # self.frame_write_timer = Timer(name="FrameWrite", logger=None)
+        # self.select_timer = Timer(name="Select", logger=None)
+        # self.mm_read_timer = Timer(name="MMRead", logger=None)
 
     def __enter__(self):
         return self.config_camera()
 
-    def __exit__(self, exc_type=None, exc_value=None, exc_tb=None):
+    def close(self):
         self.vd.close()
+
+    def __exit__(self, exc_type=None, exc_value=None, exc_tb=None):
+        self.close()
 
     def stream_on(self):
         return self.xioctl(VIDIOC_STREAMON, self.buf_type)
@@ -194,24 +195,21 @@ class UVCCamera(object):
         while self.do_stream:
             self.read_frame()
 
-        self.latency_timer_stop()
         self.stream_off()
 
     def read_frame(self):
-        self.latency_timer_start()
+        # self.frame_timer.start()
+        # self.frame_acq_timer.start()
 
-        self.frame_timer.start()
-        self.frame_acq_timer.start()
-
-        self.select_timer.start()
+        # self.select_timer.start()
         max_t = 1
         ready_to_read, ready_to_write, in_error = select.select([self.vd], [], [], max_t)
 
         if len(ready_to_read) == 0:
             raise Exception("Select timeout.")
-        self.select_timer.stop()
+        # self.select_timer.stop()
 
-        self.mm_read_timer.start()
+        # self.mm_read_timer.start()
         self.xioctl(VIDIOC_DQBUF, self.buf)  # get image from the driver queue
         # print("self.buf.index", self.buf.index)
         f = b''
@@ -221,63 +219,43 @@ class UVCCamera(object):
             # default to memory map
             mm = self.buffers[self.buf.index]
             f = mm.read()
-        self.mm_read_timer.stop()
+        # self.mm_read_timer.stop()
 
-        self.frame_acq_timer.stop()
+        # self.frame_acq_timer.stop()
 
-        self.frame_write_timer.start()
+        # self.frame_write_timer.start()
         self.output.write(f)
         # self.output.write(f.tobytes())  # another option for array.array.  converting here is slower
 
-        self.frame_write_timer.stop()
+        # self.frame_write_timer.stop()
         # self.output.write(mm.read())
         if self.buf.memory == V4L2_MEMORY_MMAP:
             mm.seek(0)
 
         self.xioctl(VIDIOC_QBUF, self.buf)  # requeue the buffer
         self.frames_read += 1
-        self.frame_timer.stop()
+        # self.frame_timer.stop()
 
         return
 
     def stop_recording(self):
         print("Stopping streaming..")
         self.do_stream = False
-        time_msg = f"\tProcessed {self.frames_read} frames averaging "
-        time_msg += f"{(Timer.timers['Frame']/self.frames_read)*1000:0.2f}ms/frame"
+        time_msg = f"\tProcessed {self.frames_read} frames"
+        # time_msg += f"{(Timer.timers['Frame']/self.frames_read)*1000:0.2f}ms/frame"
         print(time_msg)
-        print(f"\tAcquiring Frame: {(Timer.timers['FrameAcquisition']/self.frames_read*1000):0.2f}ms/frame")
-        print(f"\t\tWaiting for Device: {(Timer.timers['Select']/self.frames_read*1000):0.2f}ms/frame")
-        print(f"\t\tReading Frame from Buffer: {(Timer.timers['MMRead']/self.frames_read*1000):0.2f}ms/frame")
-        print(f"\tWriting Frame: {(Timer.timers['FrameWrite']/self.frames_read*1000):0.2f}ms/frame")
+        # timers disabled for now
+        # print(f"\tAcquiring Frame: {(Timer.timers['FrameAcquisition']/self.frames_read*1000):0.2f}ms/frame")
+        # print(f"\t\tWaiting for Device: {(Timer.timers['Select']/self.frames_read*1000):0.2f}ms/frame")
+        # print(f"\t\tReading Frame from Buffer: {(Timer.timers['MMRead']/self.frames_read*1000):0.2f}ms/frame")
+        # print(f"\tWriting Frame: {(Timer.timers['FrameWrite']/self.frames_read*1000):0.2f}ms/frame")
 
-        try:
-            print(f"Latency Estimate: {(Timer.timers['LatencyTimer']/self.frames_read*1000):0.2f}ms/frame")
-        except KeyError:
-            pass
+        # try:
+        #     print(f"Latency Estimate: {(Timer.timers['LatencyTimer']/self.frames_read*1000):0.2f}ms/frame")
+        # except KeyError:
+        #     pass
 
         self.streaming_thread.join()  #todo add timeout and check is_alive
-
-    def latency_timer_start(self):
-        try:
-            self.latency_timer.start()
-        except AttributeError:
-            return
-        except TimerError:
-            return
-        except Exception as e:
-            raise e
-
-    def latency_timer_stop(self):
-        try:
-            self.latency_timer.stop()
-        except AttributeError:
-            return
-        except TimerError:
-            return
-        except Exception as e:
-            raise e
-
 
     def xioctl(self, request, arg):
         """Python version of wrapper to handle errors.
@@ -302,12 +280,19 @@ if __name__ == '__main__':
     t0 = time.time()
     duration = 5.0
 
-    with UVCCamera(device='/dev/video0') as camera:
-        print("Starting recording..")
-        camera.start_recording(vid)
-        time.sleep(duration)
-        print("Stopping recording..")
-        camera.stop_recording()
+    do_test = True
+
+    while do_test:
+        with UVCCamera(device='/dev/video0') as camera:
+            print("Starting recording..")
+            camera.start_recording(vid)
+            time.sleep(duration)
+            print("Stopping recording..")
+            camera.stop_recording()
+
+        cont = input("Re-test: ")
+        if cont.lower() != 'y' and cont.lower() != 'yes':
+            do_test = False
 
     vid.close()
     print("Done.")

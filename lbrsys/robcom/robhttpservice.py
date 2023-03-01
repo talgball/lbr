@@ -45,7 +45,7 @@ import threading
 
 from pyquaternion import Quaternion
 
-from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL
+from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL, CAMERAS
 from lbrsys import feedback, exec_report
 
 from lbrsys.robcom import robauth
@@ -266,6 +266,7 @@ class RobHandler(BaseHTTPRequestHandler):
     def handle_telemetry(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
+        # self.send_header('Content-Type', 'application/json')
         self.end_headers()
         buffer = json.dumps(self.server.currentTelemetry, default=str).encode()
         # json.dump(buffer, self.wfile)
@@ -273,6 +274,16 @@ class RobHandler(BaseHTTPRequestHandler):
 
         self.server.telemetry_sent = time.time()
         # print("GET path: %s" % self.path)
+
+    def handle_cameras(self):
+        """return list of cameras, not to be confused with handle_camera which sets current camera
+            Note that we're in the process of moving this function to robcamservice"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        camera_d = {'cameras': CAMERAS} # todo consider removing 'device' from data to send
+        buffer = json.dumps(camera_d, default=str).encode()
+        self.wfile.write(buffer)
 
     def handle_docksignal(self, msgD):
         self.server.receiveQ.put(feedback(msgD))
@@ -313,6 +324,23 @@ class RobHandler(BaseHTTPRequestHandler):
         print(msg)
 
         return
+
+    def handle_camera(self, msgD):
+        """sets current camera, not to be confused with handle_cameras, which returns list of cameras"""
+        try:
+            if 'name' in msgD['select_camera']:
+                camera_command = f"/camera/{msgD['select_camera']['name']}"
+            else:
+                camera_command = f"/camera/front"
+
+        except KeyError:
+            camera_command = f"/s/Bad camera selection post: {str(msgD)}"
+        except Exception as e:
+            camera_command = f"/s/Unexpected error in camera command: {str(msgD)}\n{str(e)}"
+
+        self.server.sendQ.put(camera_command)
+        return
+
 
     def is_user_authorized(self):
         try:
@@ -362,6 +390,10 @@ class RobHandler(BaseHTTPRequestHandler):
             self.handle_telemetry()
             return
 
+        if self.path.startswith('/cameras'):
+            self.handle_cameras()
+            return
+
         self.send_response(404)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
@@ -407,6 +439,9 @@ class RobHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/wakeup':
             self.handle_wakeup(msgD)
+
+        elif self.path == '/camera':
+            self.handle_camera(msgD)
 
         return
 

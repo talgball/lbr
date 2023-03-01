@@ -51,6 +51,7 @@ import io
 import logging
 import socketserver
 import ssl
+import json
 from threading import Condition
 from http import server
 import multiprocessing
@@ -115,7 +116,20 @@ class StreamingOutput(object):
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == '/':
+        if self.path == '/cameras':
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            camera_d = {'cameras': CAMERAS}  # todo consider removing 'device' from data to send
+            buffer = json.dumps(camera_d, default=str).encode()
+            self.wfile.write(buffer)
+        elif self.path.startswith('/camera/'):
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.handle_camera()
+            self.wfile.write('\r\n'.encode())
+        elif self.path == '/':
             self.send_response(301)
             self.send_header('Location', '/index.html')
             self.end_headers()
@@ -153,13 +167,35 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_error(404)
             self.end_headers()
 
+    def handle_camera(self):
+        """sets current camera - likely should be moved to a POST function"""
+        try:
+            if self.path.startswith('/camera/'):
+                requested_camera_name = self.path.split('/')[2]
+                camera_command = select_camera(requested_camera_name)
+                self.server.commandQ.put(camera_command)
+
+        except KeyError:
+            msg = f"Unknown camera for selection request: {self.path}"
+            logging.debug(msg)
+            print(msg)
+        except Exception as e:
+            msg = f"Unexpected error for camera selection request: {self.path} - {str(e)}"
+            logging.debug(msg)
+            print(msg)
+
+        return
+
+
 class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, handler):
+    def __init__(self, address, handler, commandQ=None, broadcastQ=None):
         server.HTTPServer.__init__(self, address, handler)
         self.set_security_mode()
+        self.commandQ = commandQ
+        self.broadcastQ = broadcastQ
 
     def set_security_mode(self):
         try:
@@ -187,7 +223,8 @@ def config_camera(camera_name):
     try:
         cam = camera.UVCCamera(device=CAMERAS[camera_name]['device'],
                                resolution='640x360',
-                               framerate=15).config_camera()
+                               framerate=15, name=camera_name).config_camera()
+
     except Exception as e:
         msg = f"Exception configuring camera: {str(camera_name)} - {e}"
         logging.debug(msg)
@@ -207,6 +244,7 @@ def start_service(commandq, broadcastq):
     try:
         for c in CAMERAS:
             current_camera = config_camera(c)
+            CAMERAS[c]['status'] = 'on'
 
             if not default_camera_started:
                 # current_camera = CAMERAS[c]['camera']
@@ -216,13 +254,13 @@ def start_service(commandq, broadcastq):
                 # todo make camera safe for reuse instead of having to rebuild
 
     except Exception as e:
-        msg = f"Exception starting camera: {str(c)} - {e}"
+        msg = f"Exception starting camera: {str(c)} - {str(e)}"
         logging.debug(msg)
         print(msg)
 
     try:
         address = ('', 9146)
-        server = StreamingServer(address, StreamingHandler)
+        server = StreamingServer(address, StreamingHandler, commandq, broadcastq)
 
         streaming_thread = threading.Thread(target=server.serve_forever, name="CameraStreamingThread")
         logging.debug("Starting Camera Streaming.")
@@ -239,15 +277,21 @@ def start_service(commandq, broadcastq):
         if task == "Shutdown":
             current_camera.stop_recording()
             current_camera.close()
+            CAMERAS[current_camera.name]['status'] = 'off'
             commandq.task_done()
             break
 
         if type(task) is select_camera and task.name in CAMERAS:
+            print(f"Processing camera task: {str(task)}")
             current_camera.stop_recording()
             current_camera.close()
+            CAMERAS[current_camera.name]['status'] = 'off'
 
-            current_camera = config_camera(task.name)
-            current_camera.start_recording(output, format='mjpeg')
+            if task.name != 'off':
+                current_camera = config_camera(task.name)
+                current_camera.start_recording(output, format='mjpeg')
+                CAMERAS[task.name]['status'] = 'on'
+
             commandq.task_done()
 
     # streaming_thread.join()  # no current termination except KeyboardInterrupt

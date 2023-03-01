@@ -43,11 +43,12 @@ class UVCCamera(object):
     def __init__(self, device='/dev/video0', video_format='mjpeg',
                  # resolution='1280x720', framerate=30, memory='USERPTR',
                  # resolution='1920x1080', framerate=30, memory='USERPTR',
-                 resolution='640x360', framerate=24, memory='USERPTR'):
+                 resolution='640x360', framerate=24, memory='USERPTR', name=None):
         self.device = device
         self.video_format = video_format
         self.width, self.height = [int(r) for r in resolution.split('x')]
         self.framerate = framerate
+        self.name = name
         self.memory = memory  # 'USERPTR' or 'MMAP'
         self.vd = None
         self.cp = None

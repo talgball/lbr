@@ -50,7 +50,7 @@ from lbrsys import speech, dance, feedback, exec_report
 from lbrsys import channelMap, command_map
 
 # These imports support dynamically launching robot processes during setup
-import robcom
+from lbrsys import robcom
 import robcom.robhttpservice
 import robcom.speechsrvcs
 import robcom.robcamservice

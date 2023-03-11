@@ -115,21 +115,35 @@ class StreamingOutput(object):
         pass
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        """" Setup to support ajax queries from client"""
+        # print("Headers: %s" % str(self.headers))
+        self.send_response(200, 'ok')
+        # self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'X-Requested-With, Content-type, User, Authorization')
+        self.end_headers()
+        return
+
     def do_GET(self):
-        if self.path == '/cameras':
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            camera_d = {'cameras': CAMERAS}  # todo consider removing 'device' from data to send
-            buffer = json.dumps(camera_d, default=str).encode()
-            self.wfile.write(buffer)
-        elif self.path.startswith('/camera/'):
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.handle_camera()
-            self.wfile.write('\r\n'.encode())
-        elif self.path == '/':
+        """ Disabling camera controls for this service for now.  todo debug CORS issue.
+            Currently serving camera information as telemetry.
+        """
+        # if self.path == '/cameras':
+        #     self.send_response(200)
+        #     self.send_header('Access-Control-Allow-Origin', '*')
+        #     self.end_headers()
+        #     camera_d = {'cameras': CAMERAS}  # todo consider removing 'device' from data to send
+        #     buffer = json.dumps(camera_d, default=str).encode()
+        #     self.wfile.write(buffer)
+        # elif self.path.startswith('/camera/'):
+        #     self.send_response(200)
+        #     self.send_header('Access-Control-Allow-Origin', '*')
+        #     self.end_headers()
+        #     self.handle_camera()
+        #     self.wfile.write('\r\n'.encode())
+        if self.path == '/':
             self.send_response(301)
             self.send_header('Location', '/index.html')
             self.end_headers()
@@ -168,7 +182,10 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.end_headers()
 
     def handle_camera(self):
-        """sets current camera - likely should be moved to a POST function"""
+        """sets current camera - likely should be moved to a POST function.
+                This function is currently unused, since cameras are controlled through
+                robhttpservice.
+        """
         try:
             if self.path.startswith('/camera/'):
                 requested_camera_name = self.path.split('/')[2]
@@ -250,6 +267,7 @@ def start_service(commandq, broadcastq):
                 # current_camera = CAMERAS[c]['camera']
                 current_camera.start_recording(output, format='mjpeg')
                 default_camera_started = True
+                broadcastq.put({"cameras" : dict(CAMERAS)})
                 break # for now, only setup one camera at a time until ready for reusue.
                 # todo make camera safe for reuse instead of having to rebuild
 
@@ -292,6 +310,7 @@ def start_service(commandq, broadcastq):
                 current_camera.start_recording(output, format='mjpeg')
                 CAMERAS[task.name]['status'] = 'on'
 
+            broadcastq.put({"cameras": dict(CAMERAS)})
             commandq.task_done()
 
     # streaming_thread.join()  # no current termination except KeyboardInterrupt

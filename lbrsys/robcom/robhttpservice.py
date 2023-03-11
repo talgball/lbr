@@ -177,7 +177,8 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
                             self.currentTelemetry[k] = v
 
                 else:
-                    print("Please send telemetry feedback as dict: %s" % (msg.info))
+                    print(f"Got feedback with type {type(msg.info)}")
+                    print(f"Please send telemetry feedback as dict: {msg.info}")
 
                 self.newTelemetry = True
         return
@@ -186,6 +187,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
 class RobHandler(BaseHTTPRequestHandler):
     buffering = 1 # line buffering mode
     http_log_file = open(robhttpLogFile, 'w', buffering)
+    # http_buffer_log = open(robhttpLogFile+".buf", 'wb')
 
     def log_message(self, format, *args):
         self.http_log_file.write("%s - - [%s] %s\n" %
@@ -267,21 +269,24 @@ class RobHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         # self.send_header('Content-Type', 'application/json')
+        # todo determine why the web app doesn't work with application/json
+        self.send_header('Content-Type', 'text/plain')
         self.end_headers()
-        buffer = json.dumps(self.server.currentTelemetry, default=str).encode()
+        buffer = json.dumps(self.server.currentTelemetry, default=str).encode('utf-8')
         # json.dump(buffer, self.wfile)
         self.wfile.write(buffer)
+        # self.http_buffer_log.write(buffer)
 
         self.server.telemetry_sent = time.time()
         # print("GET path: %s" % self.path)
 
     def handle_cameras(self):
         """return list of cameras, not to be confused with handle_camera which sets current camera
-            Note that we're in the process of moving this function to robcamservice"""
+            Note that we're considering moving this function to robcamservice"""
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        camera_d = {'cameras': CAMERAS} # todo consider removing 'device' from data to send
+        camera_d = self.server.currentTelemetry.get('cameras', CAMERAS)  # todo consider removing 'device' from data to send
         buffer = json.dumps(camera_d, default=str).encode()
         self.wfile.write(buffer)
 
@@ -327,6 +332,9 @@ class RobHandler(BaseHTTPRequestHandler):
 
     def handle_camera(self, msgD):
         """sets current camera, not to be confused with handle_cameras, which returns list of cameras"""
+
+        # todo finalize protocol for this communication, as well as error checking.
+        """
         try:
             if 'name' in msgD['select_camera']:
                 camera_command = f"/camera/{msgD['select_camera']['name']}"
@@ -337,8 +345,26 @@ class RobHandler(BaseHTTPRequestHandler):
             camera_command = f"/s/Bad camera selection post: {str(msgD)}"
         except Exception as e:
             camera_command = f"/s/Unexpected error in camera command: {str(msgD)}\n{str(e)}"
+        """
 
-        self.server.sendQ.put(camera_command)
+        requested_camera = self.path.split('/')[2]
+        if requested_camera in CAMERAS:
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write("{}\r\n".encode())
+
+            if requested_camera != "off":
+                camera_command = self.path
+                self.server.sendQ.put(camera_command)
+        else:
+            self.send_response(204)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(f'{{"camera": "{requested_camera}-Not Found"}}\r\n'.encode())
+
         return
 
 
@@ -440,7 +466,7 @@ class RobHandler(BaseHTTPRequestHandler):
         elif self.path == '/wakeup':
             self.handle_wakeup(msgD)
 
-        elif self.path == '/camera':
+        elif self.path.startswith('/camera/'):
             self.handle_camera(msgD)
 
         return

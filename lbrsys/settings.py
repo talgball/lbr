@@ -80,9 +80,16 @@ tokenFile = os.path.join(os.path.join(os.environ['ROBOT_CRED'], 'robauth.tokens'
 # audio directory
 AUDIO_DIR = os.path.join(BASE_DIR, 'media', 'audio')
 
-# camera list
+# camera list and non-default settings
 CAMERAS = OrderedDict({'front': {'device': '/dev/video0', 'status': 'off'},
-                       'rear': {'device': '/dev/video2', 'status': 'off'},
+                       'rear': {'device': '/dev/video2', 'status': 'off',
+                                'settings': {'user': {'power_line_frequency': 2,  # 60Hz
+                                                      'brightness': 17,
+                                                      },
+                                             'camera': {'auto_exposure': 1,  # Manual mode
+                                                        'exposure_time_absolute': 681, # x100us
+                                                        },
+                                             }},
                        'off': {'device': '', 'status': 'off'},
                     })
 

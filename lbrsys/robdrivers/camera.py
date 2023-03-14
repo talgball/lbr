@@ -36,6 +36,34 @@ import threading
 import array
 
 from codetiming import Timer, TimerError
+from lbrsys.settings import CAMERAS
+
+
+# Mapping control settings to the api defined values.
+#   Minimum coverage is for lbr6 cameras as of 2023-03-13
+V4L2_CONTROLS = {'user': {'brightness': V4L2_CID_BRIGHTNESS,
+                          'contrast': V4L2_CID_CONTRAST,
+                          'saturation': V4L2_CID_SATURATION,
+                          'hue': V4L2_CID_HUE,
+                          'white_balance_automatic': V4L2_CID_WHITENESS,
+                          'gain': V4L2_CID_GAIN,
+                          'gamma': V4L2_CID_GAMMA,
+                          'power_line_frequency': V4L2_CID_POWER_LINE_FREQUENCY,
+                          'white_balance_temperature': V4L2_CID_WHITE_BALANCE_TEMPERATURE,
+                          'sharpness': V4L2_CID_SHARPNESS,
+                          'backlight_compensation': V4L2_CID_BACKLIGHT_COMPENSATION,
+                          },
+                 'camera': {'auto_exposure': V4L2_CID_EXPOSURE_AUTO,
+                            'exposure_time_absolute': V4L2_CID_EXPOSURE_ABSOLUTE,
+                            'exposure_dynamic_framerate': '',  # Have not determined the value
+                            'pan_absolute': V4L2_CID_PAN_ABSOLUTE,
+                            'tilt_absolute': V4L2_CID_TILT_ABSOLUTE,
+                            'focus_absolute': V4L2_CID_FOCUS_ABSOLUTE,
+                            'focus_automatic_continuous': V4L2_CID_FOCUS_AUTO,
+                            'zoom_absolute': V4L2_CID_ZOOM_ABSOLUTE,
+                            'led1_mode': '',  # Have not determied the value
+                            'led1_frequency': '',  # Have not determined the value
+                            }}
 
 
 class UVCCamera(object):
@@ -107,6 +135,10 @@ class UVCCamera(object):
             self.fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG # todo only does mjpeg for now
             # self.fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV
             self.xioctl(VIDIOC_S_FMT, self.fmt)
+            if self.config_camera_details():
+                print("Details configured.")
+            else:
+                print(f"Error configuring details for camera: {name}")
 
             print("Verifying settings..")  #todo change to assert statements
             self.xioctl(VIDIOC_G_FMT, self.fmt)  # get current settings
@@ -115,7 +147,7 @@ class UVCCamera(object):
             print("bytesperline:", self.fmt.fmt.pix.bytesperline)
             print("sizeimage:", self.fmt.fmt.pix.sizeimage)
 
-            print("Getting streaming parameters.")  # todo somewhere in here you can set the camera framerate
+            print("Getting streaming parameters.")
             parm = v4l2_streamparm()
             parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE
             parm.parm.capture.capability = V4L2_CAP_TIMEPERFRAME
@@ -141,6 +173,31 @@ class UVCCamera(object):
             raise e
 
         return self
+
+    def config_camera_details(self):
+        if not 'settings' in CAMERAS[self.name]:
+            return True
+
+        user_settings = CAMERAS[self.name]['settings'].get('user', {})
+        camera_settings = CAMERAS[self.name]['settings'].get('camera', {})
+        settings = user_settings | camera_settings  # combined since same control applies to both groups
+        v4l2_controls_all = V4L2_CONTROLS['user'] | V4L2_CONTROLS['camera']
+        control = v4l2_control()
+
+        s = None
+        try:
+            for s in settings:
+                control.id = v4l2_controls_all[s]
+                control.value = settings[s]
+                print(f"Configuring setting {s}")
+                self.xioctl(VIDIOC_S_CTRL, control)
+        except Exception as e:
+            print(f"Error setting camera details: {s}, {settings[s]}, {str(e)}.  Ignored.")
+            return False
+
+        return True
+
+
 
     def prepare_buffers(self, memory=None):
         if memory is None:
@@ -284,7 +341,7 @@ if __name__ == '__main__':
     do_test = True
 
     while do_test:
-        with UVCCamera(device='/dev/video0') as camera:
+        with UVCCamera(device='/dev/video2', name='rear') as camera:
             print("Starting recording..")
             camera.start_recording(vid)
             time.sleep(duration)

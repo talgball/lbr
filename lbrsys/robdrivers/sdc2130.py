@@ -332,22 +332,22 @@ class SDC2130:
                 else:
                     commandReply = reply[0]
             except SerialException as e:
-                print('\t***error writing motor command: %s to %s' % (motorCommand,self.port))
+                print('\t***error writing motor command: %s to %s' % (self.motorCommand,self.port))
                 print('\tSerial Exception: {}'.format(str(e)))
                 commandReply = b''
 
             if chr(commandReply) == '+':
                 result = motorCommandResult('Success',
-                                            motorCommand, commandReply, t)
+                                            self.motorCommand, commandReply, t)
             elif chr(commandReply) == '-':
                 result = motorCommandResult('Failure',
-                          motorCommand, commandReply, t)
+                          self.motorCommand, commandReply, t)
             else:
                 result = motorCommandResult('Unacknowledged',
-                          motorCommand, commandReply, t)
+                          self.motorCommand, commandReply, t)
         else:
             result = motorCommandResult('Disabled',
-                                        motorCommand, '', t)
+                                        self.motorCommand, '', t)
 
         self.motorControlPub.publish(result)
         logging.debug(result)

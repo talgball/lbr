@@ -101,14 +101,15 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
     def set_security_mode(self):
         try:
             if USE_SSL:
-                self.socket = ssl.wrap_socket(
-                    self.socket,
-                    server_side=True,
-                    certfile=os.environ['ROBOT_CERT'],
-                    keyfile=os.environ['ROBOT_KEY']
-                )
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                context.load_cert_chain(certfile=os.environ['ROBOT_CERT'],
+                                        keyfile=os.environ['ROBOT_KEY'])
+
+                self.socket = context.wrap_socket(self.socket, server_side=True)
+
         except Exception as e:
             logging.error("Exception securing http server: {}".format(str(e)))
+
 
     # todo simplify heartbeat management using threading.Timer
     def set_heartbeat(self):
@@ -116,6 +117,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
             self.heartbeat_thread = threading.Thread(target=self.check_heartbeat)
             self.heartbeat_thread.start()
             self.heartbeat = True
+
 
     def check_heartbeat(self, pulse=2.0):
         time.sleep(pulse)

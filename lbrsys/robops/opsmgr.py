@@ -247,9 +247,9 @@ class Opsmgr(object):
     def processStats(self,opsStats):
         opsStats['AverageLoopTime'] = opsStats['totalLoopTime']/opsStats['numLoops']
         if opsStats['numWaits'] > 0:
-            opsStats['AverageWaitTime:'] = opsStats['totalWaitTime']/opsStats['numWaits']
+            opsStats['AverageWaitTime'] = opsStats['totalWaitTime']/opsStats['numWaits']
         else:
-            opsStats['AverageWaitTime:'] = 0.
+            opsStats['AverageWaitTime'] = 0.
         #self.broadcastQ.put(opsStats)
         logging.info("Operations Stats\n%s\n" % (pprint.pformat(opsStats)))
         #pprint.pformat(opsStats)

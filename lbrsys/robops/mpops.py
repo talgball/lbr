@@ -197,7 +197,7 @@ class MPservice(object):
     def processStats(self,opsStats):
         opsStats['AverageLoopTime'] = opsStats['totalLoopTime']/opsStats['numLoops']
         if opsStats['numWaits'] != 0:
-            opsStats['AverageWaitTime:'] = opsStats['totalWaitTime']/opsStats['numWaits']
+            opsStats['AverageWaitTime'] = opsStats['totalWaitTime']/opsStats['numWaits']
         logging.debug("Motion Processing Services Operational Statistics")
         logging.debug("%s\n" % (pprint.pformat(opsStats)))
 

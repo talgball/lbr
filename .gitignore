@@ -132,3 +132,5 @@ dmypy.json
 .pyre/
 
 /media/
+/logs/
+lbrsys/robapps/robfsm/statesd/backup.csv

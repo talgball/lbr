@@ -80,6 +80,7 @@ exec_report = namedtuple('exec_report', 'name info', defaults=('telemetry', {}))
 screen      = namedtuple('screen', 'power')
 iot         = namedtuple('iot', 'msg')
 select_camera = namedtuple('select_camera', 'name')
+ai_request = namedtuple('ai_request', 'prompt context', defaults=(None,))
 
 # map between namedtuple (i.e. message types) and channel types
 # This map is used in message routings
@@ -96,7 +97,8 @@ channelMap = {
     'Application': {feedback, exec_report, dict},
     'Dance': {dance},
     'IoT': {iot},
-    'Camera': {select_camera}
+    'Camera': {select_camera},
+    'AI': {ai_request, feedback, exec_report},
 }
 
 # command_map generalizes and streamlines console command processing
@@ -115,6 +117,7 @@ command_map = {
     'm': {3: {calibrateMagnetometer: [int, str]}},
     'report': {2: {exec_report: [str]}},
     'camera': {2: {select_camera: [str]}},
+    'ai': {2: {ai_request: [str]}},
 }
 
 

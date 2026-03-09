@@ -54,6 +54,7 @@ from lbrsys import robcom
 import robcom.robhttpservice
 import robcom.speechsrvcs
 import robcom.robcamservice
+import robcom.robaiservice
 import robops
 import robops.opsmgr
 import robops.mpops

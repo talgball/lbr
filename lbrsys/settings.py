@@ -53,6 +53,11 @@ Y_Convention = 1  # Y - clockwise and right are positive
 Z_Convention = -1 # Z - clockwise and up are negative (e.g., gravity is down)
 
 
+# AI Service - set to True to enable the OpenAI-based AI service
+#   Requires environment variable ROBOT_OPENAI_API_KEY
+#   Optional: ROBOT_OPENAI_MODEL (default: gpt-4o)
+AI_SERVICE = True
+
 # URL for experimental use of the Jitsi system for teleconferencing (not currently in use)
 jitsiURL = "https://meet.jit.si/bfrobotics"
 
@@ -112,6 +117,7 @@ iotLogFile     = os.path.join(LOG_DIR, 'iot.log')
 rangeobserverLogFile = os.path.join(LOG_DIR, 'rangeobserver.log')
 headingobserverLogFile = os.path.join(LOG_DIR, 'headingobserver.log')
 robcamLogFile = os.path.join(LOG_DIR, 'camera.log')
+aiLogFile = os.path.join(LOG_DIR, 'ai.log')
 
 magCalibrationLogFile = os.path.join(MAG_CALIBRATION_DIR,
                                      "{today}-mag-0-raw-calibration-data.csv")

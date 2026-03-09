@@ -119,7 +119,7 @@ class RobHTTPService(ThreadingMixIn, HTTPServer):
             self.heartbeat = True
 
 
-    def check_heartbeat(self, pulse=2.0):
+    def check_heartbeat(self, pulse=1.5):
         time.sleep(pulse)
         self.heartbeat = False
         if self.motors_powered > 0 and time.time() - self.telemetry_sent > pulse:
@@ -224,7 +224,10 @@ class RobHandler(BaseHTTPRequestHandler):
             if 'duration' in msgD and msgD['duration'] != '':
                 duration = int(msgD['duration'])
 
-            command = "/r/%.2f/%d/%d/%s/%d" % (level, angle, range, sensor, duration)
+            if range > 0 or duration > 0:
+                command = "/r/%.2f/%d/%d/%s/%d" % (level, angle, range, sensor, duration)
+            else:
+                command = "/r/%.2f/%d" % (level, angle)
 
             if msgD['level'] > 0:
                 self.server.motors_powered = time.time()

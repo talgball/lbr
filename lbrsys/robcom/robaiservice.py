@@ -233,9 +233,9 @@ class RobAIService:
         """Initialize OpenAI client from environment variables."""
         try:
             from openai import OpenAI
-            api_key = os.environ.get('ROBOT_OPENAI_API_KEY')
+            api_key = os.environ.get('ROBOT_OPENAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
             if not api_key:
-                logging.error("ROBOT_OPENAI_API_KEY not set")
+                logging.error("Neither ROBOT_OPENAI_API_KEY or OPENAI_API_KEY are set")
                 print("Warning: ROBOT_OPENAI_API_KEY not set - AI service will not "
                       "be able to process requests")
                 return

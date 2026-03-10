@@ -53,6 +53,11 @@ Y_Convention = 1  # Y - clockwise and right are positive
 Z_Convention = -1 # Z - clockwise and up are negative (e.g., gravity is down)
 
 
+# Camera service snapshot URL for AI vision
+CAMERA_SERVICE_PORT = 9146
+_cam_scheme = 'https' if USE_SSL else 'http'
+CAMERA_SNAPSHOT_URL = f'{_cam_scheme}://localhost:{CAMERA_SERVICE_PORT}/snapshot.jpg'
+
 # AI Service - set to True to enable the OpenAI-based AI service
 #   Requires environment variable ROBOT_OPENAI_API_KEY
 #   Optional: ROBOT_OPENAI_MODEL (default: gpt-4o)

@@ -37,6 +37,9 @@ import logging
 import multiprocessing
 import threading
 import queue
+import base64
+import urllib.request
+import ssl
 
 from lbrsys import ai_request, feedback, exec_report
 from lbrsys.settings import aiLogFile
@@ -62,6 +65,9 @@ sequence if needed.
 When you have a text response for the operator, use the speak tool to say it
 through the robot's speech system, or the report tool to send it as a text
 report to the console.
+
+If camera images are attached, they show the current view from the robot's
+active camera. Use them to understand the robot's surroundings when relevant.
 
 Current robot state:
 {state}
@@ -361,6 +367,32 @@ class RobAIService:
         t.daemon = True
         t.start()
 
+    def _fetch_snapshot(self):
+        """Fetch JPEG snapshot from camera service. Returns base64 string or None."""
+        cameras = self.state.get('cameras', {})
+        active = [n for n, info in cameras.items()
+                  if n != 'off' and isinstance(info, dict) and info.get('status') == 'on']
+
+        if not active:
+            return None
+
+        try:
+            from lbrsys.settings import CAMERA_SNAPSHOT_URL, USE_SSL
+            ctx = None
+            if USE_SSL:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+
+            req = urllib.request.Request(CAMERA_SNAPSHOT_URL)
+            with urllib.request.urlopen(req, timeout=2, context=ctx) as resp:
+                frame_bytes = resp.read()
+
+            return base64.b64encode(frame_bytes).decode('ascii')
+        except Exception as e:
+            logging.warning("Failed to fetch snapshot: %s" % str(e))
+            return None
+
     def _call_openai(self, request):
         """Worker thread: call OpenAI API and process the response."""
         try:
@@ -380,10 +412,29 @@ class RobAIService:
         # Include recent conversation history for context
         messages.extend(self.conversation[-10:])
 
-        # Add the new user message
-        user_message = {"role": "user", "content": request.prompt}
+        # Add the new user message, with camera snapshot if available
+        snapshot_b64 = self._fetch_snapshot()
+
+        if snapshot_b64:
+            user_message = {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": request.prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{snapshot_b64}"
+                        }
+                    }
+                ]
+            }
+        else:
+            user_message = {"role": "user", "content": request.prompt}
+
+        # Store text-only in conversation history (avoid memory bloat from base64)
+        conversation_message = {"role": "user", "content": request.prompt}
         messages.append(user_message)
-        self.conversation.append(user_message)
+        self.conversation.append(conversation_message)
 
         try:
             response = self.client.chat.completions.create(

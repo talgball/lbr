@@ -155,6 +155,18 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(content)
+        elif self.path == '/snapshot.jpg':
+            frame = output.frame
+            if frame:
+                self.send_response(200)
+                self.send_header('Content-Type', 'image/jpeg')
+                self.send_header('Content-Length', len(frame))
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                self.wfile.write(frame)
+            else:
+                self.send_error(503, 'No frame available')
+                self.end_headers()
         elif self.path == '/stream.mjpg':
             self.send_response(200)
             self.send_header('Age', 0)

@@ -157,6 +157,48 @@ ROBOT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "navigate",
+            "description": "Move the robot with specified power, angle, range, sensor, "
+                           "and/or duration. Use this instead of 'move' when you want "
+                           "the robot to move for a specific duration or distance. "
+                           "The robot will stop automatically when the range or duration "
+                           "limit is reached.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "number",
+                        "description": "Power level from 0.0 to 1.0"
+                    },
+                    "angle": {
+                        "type": "integer",
+                        "description": "Direction in degrees (0=forward)"
+                    },
+                    "range": {
+                        "type": "integer",
+                        "description": "Distance limit in cm (0 = no limit)",
+                        "default": 0
+                    },
+                    "sensor": {
+                        "type": "string",
+                        "description": "Range sensor direction to monitor: "
+                                       "Forward, Back, Left, or Right",
+                        "enum": ["Forward", "Back", "Left", "Right"],
+                        "default": "Forward"
+                    },
+                    "duration": {
+                        "type": "integer",
+                        "description": "Time limit in seconds (0 = no limit)",
+                        "default": 0
+                    },
+                },
+                "required": ["level", "angle"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "report",
             "description": "Send a text report to the robot's console/operator. "
                            "Use this for information that should be displayed, not spoken.",
@@ -194,6 +236,14 @@ def execute_tool_call(tool_name, arguments, broadcastQ):
     elif tool_name == "turn":
         angle = float(arguments["angle"])
         command = "/t/%.1f" % angle
+
+    elif tool_name == "navigate":
+        level = float(arguments["level"])
+        angle = int(arguments["angle"])
+        range_limit = int(arguments.get("range", 0))
+        sensor = arguments.get("sensor", "Forward")
+        duration = int(arguments.get("duration", 0))
+        command = "/r/%.2f/%d/%d/%s/%d" % (level, angle, range_limit, sensor, duration)
 
     elif tool_name == "navigate_to_heading":
         heading = float(arguments["heading"])

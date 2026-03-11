@@ -373,10 +373,12 @@ class RobMicrophoneService:
                 continue
 
             if self.state == WAKE_LISTENING:
-                # Skip vosk processing during silence to save CPU
-                rms = self._calculate_rms(recent)
-                if rms <= MIC_SILENCE_THRESHOLD:
-                    continue
+                # Note: we always feed audio to vosk even during silence.
+                # Vosk is a streaming recognizer that needs continuous audio
+                # to maintain acoustic context. Gating on RMS silence can
+                # cause missed wake words when speech onset is quiet.
+                # If CPU becomes a concern, consider feeding zero-filled
+                # buffers during silence instead of skipping entirely.
 
                 # Feed audio to vosk for local transcription
                 if self.vosk_recognizer.AcceptWaveform(recent):

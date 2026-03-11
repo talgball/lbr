@@ -63,6 +63,16 @@ CAMERA_SNAPSHOT_URL = f'{_cam_scheme}://localhost:{CAMERA_SERVICE_PORT}/snapshot
 #   Optional: ROBOT_OPENAI_MODEL (default: gpt-4o)
 AI_SERVICE = True
 
+# Microphone service
+MIC_SERVICE = True
+MIC_DEVICE = None                      # None = auto-detect C920; or 'hw:1,0'
+MIC_SAMPLE_RATE = 16000
+MIC_CHANNELS = 1
+MIC_RING_BUFFER_SECONDS = 3.0
+MIC_SILENCE_THRESHOLD = 500            # RMS energy for voice activity detection
+MIC_SILENCE_DURATION = 2.0             # Seconds of silence to end capture
+MIC_MAX_CAPTURE_DURATION = 30.0
+
 # URL for experimental use of the Jitsi system for teleconferencing (not currently in use)
 jitsiURL = "https://meet.jit.si/bfrobotics"
 
@@ -123,6 +133,7 @@ rangeobserverLogFile = os.path.join(LOG_DIR, 'rangeobserver.log')
 headingobserverLogFile = os.path.join(LOG_DIR, 'headingobserver.log')
 robcamLogFile = os.path.join(LOG_DIR, 'camera.log')
 aiLogFile = os.path.join(LOG_DIR, 'ai.log')
+micLogFile = os.path.join(LOG_DIR, 'microphone.log')
 
 magCalibrationLogFile = os.path.join(MAG_CALIBRATION_DIR,
                                      "{today}-mag-0-raw-calibration-data.csv")

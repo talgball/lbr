@@ -55,6 +55,7 @@ import robcom.robhttpservice
 import robcom.speechsrvcs
 import robcom.robcamservice
 import robcom.robaiservice
+import robcom.robmicservice
 import robops
 import robops.opsmgr
 import robops.mpops
@@ -325,6 +326,13 @@ class Robot(object):
                     print("\tUnknown stop {}".format(cw1))
                     logging.debug("Unknown stop {}".format(cw1))
                 return None
+
+        # If cmd is already a typed namedtuple known to channelMap, pass through
+        # for type-based routing via execSend()
+        if hasattr(cmd, '_fields'):
+            for channel_types in channelMap.values():
+                if type(cmd) in channel_types:
+                    return cmd
 
         if type(cmd) is str and len(cmd) > 3:
             preparedCommand = None

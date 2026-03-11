@@ -35,3 +35,4 @@ opencv-python==4.8.1.78
 opencv-contrib-python==4.8.1.78
 fonttools==4.60.2
 openai
+pyalsaaudio

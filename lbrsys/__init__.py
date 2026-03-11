@@ -81,6 +81,8 @@ screen      = namedtuple('screen', 'power')
 iot         = namedtuple('iot', 'msg')
 select_camera = namedtuple('select_camera', 'name')
 ai_request = namedtuple('ai_request', 'prompt context', defaults=(None,))
+mic_command = namedtuple('mic_command', 'action params', defaults=(None,))
+mic_audio = namedtuple('mic_audio', 'audio_data format duration source')
 
 # map between namedtuple (i.e. message types) and channel types
 # This map is used in message routings
@@ -98,7 +100,8 @@ channelMap = {
     'Dance': {dance},
     'IoT': {iot},
     'Camera': {select_camera},
-    'AI': {ai_request, feedback, exec_report},
+    'AI': {ai_request, feedback, exec_report, mic_audio},
+    'Microphone': {mic_command},
 }
 
 # command_map generalizes and streamlines console command processing
@@ -118,6 +121,7 @@ command_map = {
     'report': {2: {exec_report: [str]}},
     'camera': {2: {select_camera: [str]}},
     'ai': {2: {ai_request: [str]}},
+    'mic': {2: {mic_command: [str]}},
 }
 
 

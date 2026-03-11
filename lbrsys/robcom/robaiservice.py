@@ -41,7 +41,7 @@ import base64
 import urllib.request
 import ssl
 
-from lbrsys import ai_request, feedback, exec_report
+from lbrsys import ai_request, feedback, exec_report, mic_audio
 from lbrsys.settings import aiLogFile
 
 proc = multiprocessing.current_process()
@@ -333,6 +333,8 @@ class RobAIService:
             self.handle_request(task)
         elif type(task) is feedback:
             self.update_state_from_feedback(task)
+        elif type(task) is mic_audio:
+            self.handle_audio(task)
         elif type(task) is exec_report:
             self.update_state_from_report(task)
         elif type(task) is dict:
@@ -366,6 +368,19 @@ class RobAIService:
         )
         t.daemon = True
         t.start()
+
+    def handle_audio(self, audio_msg):
+        """Handle incoming mic_audio messages."""
+        logging.info("Received audio: %.1fs, source=%s, %d bytes" %
+                     (audio_msg.duration, audio_msg.source, len(audio_msg.audio_data)))
+        print("AI service received audio: %.1fs from %s" %
+              (audio_msg.duration, audio_msg.source))
+        self.state['last_audio'] = {
+            'duration': audio_msg.duration,
+            'source': audio_msg.source,
+            'size': len(audio_msg.audio_data),
+            'time': time.asctime(),
+        }
 
     def _fetch_snapshot(self):
         """Fetch JPEG snapshot from camera service. Returns base64 string or None."""

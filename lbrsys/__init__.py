@@ -27,6 +27,20 @@ from pyquaternion import Quaternion
 from lbrsys.settings import dbfile, robot_name
 from lbrsys.robdrivers.calibration import Calibration, CalibrationSetting
 
+
+def set_process_title(name=None):
+    """Set the OS process title so it appears in ps output.
+    Uses the current multiprocessing process name if name is not provided."""
+    try:
+        import setproctitle
+        if name is None:
+            import multiprocessing
+            name = multiprocessing.current_process().name
+        setproctitle.setproctitle(name)
+    except ImportError:
+        pass
+
+
 # Named tuple definitions are used across lbrsys to build objects for
 # communicating commands, state and feedback or telemetry between modules
 # and processes

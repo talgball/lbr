@@ -42,7 +42,7 @@ sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.insert(3, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from lbrsys import mic_command, mic_audio, feedback
+from lbrsys import mic_command, mic_audio, feedback, set_process_title
 from lbrsys.settings import micLogFile
 
 proc = multiprocessing.current_process()
@@ -53,6 +53,7 @@ if proc.name == "Robot Microphone Service":
         filename=micLogFile,
         format='[%(levelname)s] (%(processName)-10s) %(message)s',
     )
+    set_process_title()
 
 
 # States
@@ -372,6 +373,11 @@ class RobMicrophoneService:
                 continue
 
             if self.state == WAKE_LISTENING:
+                # Skip vosk processing during silence to save CPU
+                rms = self._calculate_rms(recent)
+                if rms <= MIC_SILENCE_THRESHOLD:
+                    continue
+
                 # Feed audio to vosk for local transcription
                 if self.vosk_recognizer.AcceptWaveform(recent):
                     result = json.loads(self.vosk_recognizer.Result())

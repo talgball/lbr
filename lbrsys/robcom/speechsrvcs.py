@@ -30,7 +30,7 @@ import queue
 from datetime import datetime
 
 from lbrsys.settings import SPEECH_SERVICE, AUDIO_DIR, speechLogFile
-from lbrsys import speech
+from lbrsys import speech, set_process_title
 
 if SPEECH_SERVICE == 'aws_polly':
     from robcom import robttspolly as robtts
@@ -43,6 +43,7 @@ if proc.name  == 'Speech Services':
     logging.basicConfig( level=logging.DEBUG,
                          filename=speechLogFile,
                          format='[%(levelname)s] (%(processName)-10s) %(message)s', )
+    set_process_title()
 
 
 class SpeechService:

@@ -46,7 +46,7 @@ import threading
 from pyquaternion import Quaternion
 
 from lbrsys.settings import robhttpLogFile, robhttpAddress, USE_SSL, CAMERAS
-from lbrsys import feedback, exec_report
+from lbrsys import feedback, exec_report, set_process_title
 
 from lbrsys.robcom import robauth
 
@@ -55,6 +55,7 @@ proc = multiprocessing.current_process()
 if proc.name == "Robot Http Service" :
     logging.basicConfig (level=logging.DEBUG,filename = robhttpLogFile,
                         format='[%(levelname)s] (%(processName)-10s) %(message)s',)
+    set_process_title()
 
 
 class RobHTTPService(ThreadingMixIn, HTTPServer):

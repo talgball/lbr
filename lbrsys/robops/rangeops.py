@@ -31,7 +31,7 @@ import threading
 import queue
 
 from lbrsys.settings import rangeLogFile
-from lbrsys import observeRange
+from lbrsys import observeRange, set_process_title
 
 import robdrivers.p8x32lbr
 from robops import rangeobserver
@@ -43,6 +43,7 @@ if proc.name  == 'Range Services': # or proc.name == 'MainProcess':
         level=logging.DEBUG,
         filename=rangeLogFile,
         format='[%(levelname)s] (%(processName)-10s) %(message)s')
+    set_process_title()
 
 
 class Rangeservice(object):

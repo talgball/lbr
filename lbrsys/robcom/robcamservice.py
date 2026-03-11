@@ -64,7 +64,7 @@ sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.insert(3, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from lbrsys import select_camera
+from lbrsys import select_camera, set_process_title
 from lbrsys.settings import robcamLogFile, USE_SSL, CAMERAS
 # USE_SSL = False
 from lbrsys.robdrivers import camera
@@ -75,6 +75,7 @@ proc = multiprocessing.current_process()
 if proc.name == "Robot Camera Service" :
     logging.basicConfig (level=logging.DEBUG,filename = robcamLogFile,
                         format='[%(levelname)s] (%(processName)-10s) %(message)s',)
+    set_process_title()
 
 
 PAGE="""\

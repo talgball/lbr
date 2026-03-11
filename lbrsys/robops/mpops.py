@@ -35,7 +35,7 @@ if __name__ == '__main__':
     sys.path.append('..')
 
 from lbrsys import power, gyro, observeHeading, observeTurn
-from lbrsys import calibrateMagnetometer
+from lbrsys import calibrateMagnetometer, set_process_title
 from lbrsys.settings import mpLogFile
 
 # import robdrivers.mpu9150rpi
@@ -58,6 +58,7 @@ if proc.name  == 'Motion Processing Services':# or proc.name == 'MainProcess':
     logging.basicConfig(level=logging.DEBUG,
                         filename=mpLogFile,
                         format='[%(levelname)s] (%(processName)-10s) %(message)s', )
+    set_process_title()
 
 class MPservice(object):
     def __init__(self, commandQ=None, broadcastQ=None):

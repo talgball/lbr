@@ -42,7 +42,7 @@ import base64
 import urllib.request
 import ssl
 
-from lbrsys import ai_request, feedback, exec_report, mic_audio
+from lbrsys import ai_request, feedback, exec_report, mic_audio, set_process_title
 from lbrsys.settings import aiLogFile
 
 proc = multiprocessing.current_process()
@@ -53,6 +53,7 @@ if proc.name == "Robot AI Service":
         filename=aiLogFile,
         format='[%(levelname)s] (%(processName)-10s) %(message)s',
     )
+    set_process_title()
 
 
 SYSTEM_PROMPT = """You are the AI reasoning layer for a mobile robot called {robot_name}.

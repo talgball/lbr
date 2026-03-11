@@ -72,6 +72,9 @@ MIC_RING_BUFFER_SECONDS = 3.0
 MIC_SILENCE_THRESHOLD = 500            # RMS energy for voice activity detection
 MIC_SILENCE_DURATION = 2.0             # Seconds of silence to end capture
 MIC_MAX_CAPTURE_DURATION = 30.0
+MIC_WAKE_WORD = 'kevin'                # Wake word for voice activation
+MIC_VOSK_MODEL_PATH = None             # None = auto-download vosk-model-small-en-us-0.15
+MIC_AUTO_WAKE_WORD = True              # Start wake word listening on service startup
 
 # URL for experimental use of the Jitsi system for teleconferencing (not currently in use)
 jitsiURL = "https://meet.jit.si/bfrobotics"

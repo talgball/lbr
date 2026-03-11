@@ -474,8 +474,12 @@ class RobAIService:
             {"role": "system", "content": system_message},
         ]
 
-        # Include recent conversation history for context
-        messages.extend(self.conversation[-10:])
+        # Include recent conversation history for context, ensuring we don't
+        # slice into the middle of a tool_calls/tool response sequence
+        history = self.conversation[-10:]
+        while history and history[0].get('role') == 'tool':
+            history = history[1:]
+        messages.extend(history)
 
         # Add the new user message, with camera snapshot if available
         snapshot_b64 = self._fetch_snapshot()

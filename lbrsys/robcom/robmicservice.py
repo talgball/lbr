@@ -6,7 +6,9 @@ Uses ALSAMicrophone driver with voice activity detection to automatically
 capture speech segments and emit mic_audio messages.
 
 States: IDLE, LISTENING (ring buffer active, monitoring for voice),
-        CAPTURING (recording after voice activity trigger).
+        CAPTURING (recording after voice activity trigger),
+        WAKE_LISTENING (local vosk ASR monitoring for wake word),
+        WAKE_CAPTURING (wake word detected, recording command).
 """
 
 __author__ = "Tal G. Ball"
@@ -30,6 +32,7 @@ __version__ = "1.0"
 import os
 import sys
 import time
+import json
 import struct
 import logging
 import multiprocessing
@@ -56,6 +59,8 @@ if proc.name == "Robot Microphone Service":
 IDLE = 'IDLE'
 LISTENING = 'LISTENING'
 CAPTURING = 'CAPTURING'
+WAKE_LISTENING = 'WAKE_LISTENING'    # Listening for wake word via local ASR
+WAKE_CAPTURING = 'WAKE_CAPTURING'    # Wake word detected, capturing command
 
 
 class RobMicrophoneService:
@@ -71,7 +76,14 @@ class RobMicrophoneService:
         self.do_monitor = False
         self.capture_start_time = None
 
+        # Wake word detection
+        self.vosk_recognizer = None
+        self.wake_word = None
+        self.do_wake_listen = False
+        self.wake_thread = None
+
         self.setup_audio()
+        self._auto_start_wake_word()
         self.start()
 
     def setup_audio(self):
@@ -111,6 +123,17 @@ class RobMicrophoneService:
 
         logging.info("Microphone service audio setup complete")
         print("Microphone service audio setup complete")
+
+    def _auto_start_wake_word(self):
+        """Optionally start wake word listening on service startup."""
+        try:
+            from lbrsys.settings import MIC_AUTO_WAKE_WORD
+        except ImportError:
+            return
+
+        if MIC_AUTO_WAKE_WORD and self.mic:
+            logging.info("Auto-starting wake word listening")
+            self.handle_start_wake_word()
 
     def start(self):
         """Main loop — blocks on commandQ, dispatches by message type."""
@@ -155,6 +178,10 @@ class RobMicrophoneService:
             self.handle_start_capture()
         elif action == 'stop_capture':
             self.handle_stop_capture()
+        elif action == 'start_wake_word':
+            self.handle_start_wake_word()
+        elif action == 'stop_wake_word':
+            self.handle_stop_wake_word()
         else:
             logging.warning("Unknown mic command action: %s" % action)
             print("Unknown mic command: %s" % action)
@@ -235,6 +262,168 @@ class RobMicrophoneService:
 
         self._finalize_capture()
 
+    def _setup_vosk(self):
+        """Initialize vosk recognizer for wake word detection."""
+        if self.vosk_recognizer is not None:
+            return True
+
+        try:
+            from vosk import Model, KaldiRecognizer, SetLogLevel
+            from lbrsys.settings import MIC_VOSK_MODEL_PATH, MIC_SAMPLE_RATE, MIC_WAKE_WORD
+
+            SetLogLevel(-1)  # Suppress vosk debug output
+
+            self.wake_word = MIC_WAKE_WORD.lower()
+
+            if MIC_VOSK_MODEL_PATH and os.path.isdir(MIC_VOSK_MODEL_PATH):
+                model = Model(MIC_VOSK_MODEL_PATH)
+            else:
+                # Auto-download small English model
+                logging.info("Downloading vosk small English model...")
+                print("Downloading vosk small English model...")
+                model = Model(lang="en-us")
+
+            self.vosk_recognizer = KaldiRecognizer(model, MIC_SAMPLE_RATE)
+            logging.info("Vosk recognizer initialized, wake word: '%s'" % self.wake_word)
+            print("Vosk recognizer initialized, wake word: '%s'" % self.wake_word)
+            return True
+
+        except ImportError:
+            logging.error("vosk package not installed")
+            print("Warning: vosk package not installed - wake word unavailable")
+            return False
+        except Exception as e:
+            logging.error("Error initializing vosk: %s" % str(e))
+            print("Warning: vosk init failed: %s" % str(e))
+            return False
+
+    def handle_start_wake_word(self):
+        """Start listening for wake word using local vosk ASR."""
+        if not self.mic:
+            print("Microphone not available")
+            return
+
+        if self.state != IDLE:
+            print("Microphone already in state: %s" % self.state)
+            return
+
+        if not self._setup_vosk():
+            return
+
+        self.mic.start_recording(self.output)
+        self.do_wake_listen = True
+        self.wake_thread = threading.Thread(
+            target=self._wake_word_monitor,
+            name="WakeWordMonitor",
+            daemon=True,
+        )
+        self.wake_thread.start()
+
+        self.state = WAKE_LISTENING
+        status = {'microphone': {'state': WAKE_LISTENING, 'wake_word': self.wake_word}}
+        self.broadcastQ.put(status)
+        logging.info("Microphone: now WAKE_LISTENING for '%s'" % self.wake_word)
+        print("Microphone: now WAKE_LISTENING for '%s'" % self.wake_word)
+
+    def handle_stop_wake_word(self):
+        """Stop wake word listening."""
+        if self.state not in (WAKE_LISTENING, WAKE_CAPTURING):
+            print("Not in wake word mode (state: %s)" % self.state)
+            return
+
+        if self.state == WAKE_CAPTURING:
+            self._finalize_capture()
+
+        self.do_wake_listen = False
+        if self.wake_thread and self.wake_thread.is_alive():
+            self.wake_thread.join(timeout=2.0)
+
+        if self.mic:
+            self.mic.stop_recording()
+
+        self.state = IDLE
+        status = {'microphone': {'state': IDLE}}
+        self.broadcastQ.put(status)
+        logging.info("Microphone: wake word stopped, now IDLE")
+        print("Microphone: wake word stopped, now IDLE")
+
+    def _wake_word_monitor(self):
+        """Background thread: feed audio to vosk, watch for wake word.
+
+        In WAKE_LISTENING state, runs local ASR on the audio stream. When
+        the wake word is detected, starts capturing the command that follows.
+        In WAKE_CAPTURING state, monitors for silence to end capture.
+        """
+        from lbrsys.settings import (MIC_SILENCE_THRESHOLD, MIC_SILENCE_DURATION,
+                                     MIC_MAX_CAPTURE_DURATION, MIC_SAMPLE_RATE)
+
+        check_interval = 0.1
+        silence_start = None
+        chunk_bytes = int(MIC_SAMPLE_RATE * 2 * check_interval)  # bytes per interval
+
+        while self.do_wake_listen:
+            time.sleep(check_interval)
+
+            if not self.output:
+                continue
+
+            recent = self.output.ring_buffer.get_recent(check_interval)
+            if not recent or len(recent) < 4:
+                continue
+
+            if self.state == WAKE_LISTENING:
+                # Feed audio to vosk for local transcription
+                if self.vosk_recognizer.AcceptWaveform(recent):
+                    result = json.loads(self.vosk_recognizer.Result())
+                    text = result.get('text', '')
+                    if text:
+                        logging.debug("Vosk heard: '%s'" % text)
+                    if self.wake_word in text.lower():
+                        logging.info("Wake word detected in: '%s'" % text)
+                        print("Wake word '%s' detected!" % self.wake_word)
+                        self.vosk_recognizer.Reset()
+                        self.output.start_capture()
+                        self.capture_start_time = time.time()
+                        self.state = WAKE_CAPTURING
+                        silence_start = None
+                else:
+                    # Check partial results too for faster response
+                    partial = json.loads(self.vosk_recognizer.PartialResult())
+                    partial_text = partial.get('partial', '')
+                    if self.wake_word in partial_text.lower():
+                        logging.info("Wake word detected in partial: '%s'" % partial_text)
+                        print("Wake word '%s' detected!" % self.wake_word)
+                        self.vosk_recognizer.Reset()
+                        self.output.start_capture()
+                        self.capture_start_time = time.time()
+                        self.state = WAKE_CAPTURING
+                        silence_start = None
+
+            elif self.state == WAKE_CAPTURING:
+                elapsed = time.time() - self.capture_start_time
+                rms = self._calculate_rms(recent)
+
+                if elapsed >= MIC_MAX_CAPTURE_DURATION:
+                    logging.info("Max capture duration reached (%.1fs)" % elapsed)
+                    print("Max capture duration reached")
+                    self._finalize_capture()
+                    self.state = WAKE_LISTENING
+                    silence_start = None
+                    continue
+
+                if rms <= MIC_SILENCE_THRESHOLD:
+                    if silence_start is None:
+                        silence_start = time.time()
+                    elif time.time() - silence_start >= MIC_SILENCE_DURATION:
+                        logging.info("Silence timeout after wake word, "
+                                     "finalizing capture (%.1fs)" % elapsed)
+                        print("Silence detected, finalizing capture")
+                        self._finalize_capture()
+                        self.state = WAKE_LISTENING
+                        silence_start = None
+                else:
+                    silence_start = None
+
     def _monitor_audio(self):
         """Background thread: monitor ring buffer for voice activity."""
         from lbrsys.settings import (MIC_SILENCE_THRESHOLD, MIC_SILENCE_DURATION,
@@ -307,7 +496,12 @@ class RobMicrophoneService:
             channels=MIC_CHANNELS,
         )
 
-        source = 'voice_activity' if self.do_monitor else 'manual'
+        if self.do_wake_listen:
+            source = 'wake_word'
+        elif self.do_monitor:
+            source = 'voice_activity'
+        else:
+            source = 'manual'
         audio_msg = mic_audio(
             audio_data=wav_data,
             format='wav',
@@ -320,8 +514,13 @@ class RobMicrophoneService:
                       (duration, len(wav_data), source))
         print("Captured %.1fs of audio (%d bytes)" % (duration, len(wav_data)))
 
-        # Return to LISTENING if monitor is running, else IDLE
-        self.state = LISTENING if self.do_monitor else IDLE
+        # Return to appropriate listening state or IDLE
+        if self.do_wake_listen:
+            self.state = WAKE_LISTENING
+        elif self.do_monitor:
+            self.state = LISTENING
+        else:
+            self.state = IDLE
 
     @staticmethod
     def _calculate_rms(data):
@@ -335,12 +534,16 @@ class RobMicrophoneService:
 
     def _cleanup(self):
         """Clean up resources on shutdown."""
-        if self.state == CAPTURING:
+        if self.state in (CAPTURING, WAKE_CAPTURING):
             self.output.stop_capture()
 
         self.do_monitor = False
+        self.do_wake_listen = False
+
         if self.monitor_thread and self.monitor_thread.is_alive():
             self.monitor_thread.join(timeout=2.0)
+        if self.wake_thread and self.wake_thread.is_alive():
+            self.wake_thread.join(timeout=2.0)
 
         if self.mic:
             self.mic.close()
@@ -389,7 +592,7 @@ if __name__ == '__main__':
 
     print("\nMicrophone Service test harness.")
     print("Commands: start_listening, stop_listening, start_capture, "
-          "stop_capture, quit")
+          "stop_capture, start_wake_word, stop_wake_word, quit")
     while True:
         try:
             cmd = input("Mic> ")
@@ -397,7 +600,8 @@ if __name__ == '__main__':
             if cmd.lower() in ('quit', 'exit', 'q'):
                 break
             if cmd in ('start_listening', 'stop_listening',
-                       'start_capture', 'stop_capture'):
+                       'start_capture', 'stop_capture',
+                       'start_wake_word', 'stop_wake_word'):
                 cq.put(mic_command(cmd))
             elif cmd:
                 print("Unknown command: %s" % cmd)

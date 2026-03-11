@@ -31,6 +31,7 @@ __version__ = "1.0"
 
 import os
 import sys
+import io
 import time
 import json
 import logging
@@ -370,7 +371,11 @@ class RobAIService:
         t.start()
 
     def handle_audio(self, audio_msg):
-        """Handle incoming mic_audio messages."""
+        """Handle incoming mic_audio messages.
+
+        Transcribes audio via OpenAI Whisper, then passes the transcript
+        through the normal AI request pipeline for reasoning and action.
+        """
         logging.info("Received audio: %.1fs, source=%s, %d bytes" %
                      (audio_msg.duration, audio_msg.source, len(audio_msg.audio_data)))
         print("AI service received audio: %.1fs from %s" %
@@ -381,6 +386,51 @@ class RobAIService:
             'size': len(audio_msg.audio_data),
             'time': time.asctime(),
         }
+
+        if not self.client:
+            logging.warning("AI client not available - cannot transcribe audio")
+            return
+
+        # Run transcription in a thread to avoid blocking the main loop
+        t = threading.Thread(
+            target=self._transcribe_and_process,
+            args=(audio_msg,),
+            name="AI-Transcribe-Thread",
+        )
+        t.daemon = True
+        t.start()
+
+    def _transcribe_and_process(self, audio_msg):
+        """Worker thread: transcribe audio via Whisper, then process as AI request."""
+        try:
+            audio_file = io.BytesIO(audio_msg.audio_data)
+            audio_file.name = "audio.wav"
+
+            transcript = self.client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+            )
+
+            text = transcript.text.strip()
+            if not text:
+                logging.info("Whisper returned empty transcript")
+                print("AI: empty transcript, ignoring")
+                return
+
+            logging.info("Whisper transcript: %s" % text)
+            print("AI heard: \"%s\"" % text)
+
+            self.state['last_audio']['transcript'] = text
+
+            # Feed transcript through the normal AI request pipeline
+            prompt = "[Voice command from %s]: %s" % (audio_msg.source, text)
+            self.handle_request(ai_request(prompt))
+
+        except Exception as e:
+            error_msg = "Whisper transcription error: %s" % str(e)
+            logging.error(error_msg)
+            print(error_msg)
+            self.broadcastQ.put(exec_report('ai_error', error_msg))
 
     def _fetch_snapshot(self):
         """Fetch JPEG snapshot from camera service. Returns base64 string or None."""

@@ -75,11 +75,11 @@ MIC_MAX_CAPTURE_DURATION = 30.0
 MIC_AUTO_WAKE_WORD = True              # Start wake word listening on service startup
 
 # Wake word detection via openWakeWord
-# MIC_WAKE_WORD_MODEL: path to .tflite model file, or name of built-in model
-#   Built-in models: 'hey_jarvis', 'alexa', 'hey_mycroft', etc.
-#   Custom models: path to a .tflite file (e.g., trained for 'kevin')
-MIC_WAKE_WORD_MODEL = 'hey_jarvis'     # Model to use for wake word detection
-MIC_WAKE_WORD_THRESHOLD = 0.5          # Confidence threshold (0.0-1.0)
+# Set OPEN_WAKE_WORD_MODEL env var to path of a custom .onnx/.tflite model,
+# or a built-in model name. Falls back to 'hey_jarvis' if not set.
+# Built-in models: 'hey_jarvis', 'alexa', 'hey_mycroft', etc.
+MIC_WAKE_WORD_MODEL = os.getenv('OPEN_WAKE_WORD_MODEL', 'hey_jarvis')
+MIC_WAKE_WORD_THRESHOLD = 0.45          # Confidence threshold (0.0-1.0)
 MIC_WAKE_WORD_DEBUG = False            # Log all openWakeWord scores to console
 
 # URL for experimental use of the Jitsi system for teleconferencing (not currently in use)

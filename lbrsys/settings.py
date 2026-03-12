@@ -72,18 +72,15 @@ MIC_RING_BUFFER_SECONDS = 3.0
 MIC_SILENCE_THRESHOLD = 500            # RMS energy for voice activity detection
 MIC_SILENCE_DURATION = 2.0             # Seconds of silence to end capture
 MIC_MAX_CAPTURE_DURATION = 30.0
-MIC_WAKE_WORD = 'Robot'                # Wake word for voice activation
 MIC_AUTO_WAKE_WORD = True              # Start wake word listening on service startup
-MIC_VOSK_DEBUG = False                 # Log all vosk partial/final results to console
 
-# setup vosk model for local wake word detection
-# None = auto-download vosk-model-small-en-us-0.15
-MIC_VOSK_MODEL_PATH = None
-MIC_VOSK_MODEL_DIR = os.getenv("VOSK_MODELS", "")
-if MIC_VOSK_MODEL_DIR:
-    # MIC_VOSK_MODEL_PATH = os.path.join(MIC_VOSK_MODEL_DIR, 'vosk-model-en-us-0.22') # large
-    # MIC_VOSK_MODEL_PATH = os.path.join(MIC_VOSK_MODEL_DIR, 'vosk-model-en-us-0.22-lgraph') # med
-    MIC_VOSK_MODEL_PATH = os.path.join(MIC_VOSK_MODEL_DIR, 'vosk-model-small-en-us-0.15')
+# Wake word detection via openWakeWord
+# MIC_WAKE_WORD_MODEL: path to .tflite model file, or name of built-in model
+#   Built-in models: 'hey_jarvis', 'alexa', 'hey_mycroft', etc.
+#   Custom models: path to a .tflite file (e.g., trained for 'kevin')
+MIC_WAKE_WORD_MODEL = 'hey_jarvis'     # Model to use for wake word detection
+MIC_WAKE_WORD_THRESHOLD = 0.5          # Confidence threshold (0.0-1.0)
+MIC_WAKE_WORD_DEBUG = False            # Log all openWakeWord scores to console
 
 # URL for experimental use of the Jitsi system for teleconferencing (not currently in use)
 jitsiURL = "https://meet.jit.si/bfrobotics"

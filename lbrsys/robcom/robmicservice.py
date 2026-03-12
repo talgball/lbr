@@ -7,7 +7,7 @@ capture speech segments and emit mic_audio messages.
 
 States: IDLE, LISTENING (ring buffer active, monitoring for voice),
         CAPTURING (recording after voice activity trigger),
-        WAKE_LISTENING (local vosk ASR monitoring for wake word),
+        WAKE_LISTENING (openWakeWord monitoring for wake word),
         WAKE_CAPTURING (wake word detected, recording command).
 """
 
@@ -32,7 +32,6 @@ __version__ = "1.0"
 import os
 import sys
 import time
-import json
 import struct
 import logging
 import multiprocessing
@@ -78,8 +77,8 @@ class RobMicrophoneService:
         self.capture_start_time = None
 
         # Wake word detection
-        self.vosk_recognizer = None
-        self.wake_word = None
+        self.oww_model = None
+        self.wake_word_name = None
         self.do_wake_listen = False
         self.wake_thread = None
 
@@ -263,43 +262,48 @@ class RobMicrophoneService:
 
         self._finalize_capture()
 
-    def _setup_vosk(self):
-        """Initialize vosk recognizer for wake word detection."""
-        if self.vosk_recognizer is not None:
+    def _setup_wake_word(self):
+        """Initialize openWakeWord model for wake word detection."""
+        if self.oww_model is not None:
             return True
 
         try:
-            from vosk import Model, KaldiRecognizer, SetLogLevel
-            from lbrsys.settings import MIC_VOSK_MODEL_PATH, MIC_SAMPLE_RATE, MIC_WAKE_WORD
+            from openwakeword.model import Model as OWWModel
+            from lbrsys.settings import MIC_WAKE_WORD_MODEL
 
-            SetLogLevel(-1)  # Suppress vosk debug output
-
-            self.wake_word = MIC_WAKE_WORD.lower()
-
-            if MIC_VOSK_MODEL_PATH and os.path.isdir(MIC_VOSK_MODEL_PATH):
-                model = Model(MIC_VOSK_MODEL_PATH)
+            model_arg = MIC_WAKE_WORD_MODEL
+            if model_arg and (model_arg.endswith('.tflite')
+                              or model_arg.endswith('.onnx')):
+                # Custom model file path
+                self.oww_model = OWWModel(
+                    wakeword_models=[model_arg],
+                    inference_framework='onnx',
+                )
             else:
-                # Auto-download small English model
-                logging.info("Downloading vosk small English model...")
-                print("Downloading vosk small English model...")
-                model = Model(lang="en-us")
+                # Built-in model name (e.g., 'hey_jarvis')
+                self.oww_model = OWWModel(
+                    wakeword_models=[model_arg],
+                    inference_framework='onnx',
+                )
 
-            self.vosk_recognizer = KaldiRecognizer(model, MIC_SAMPLE_RATE)
-            logging.info("Vosk recognizer initialized, wake word: '%s'" % self.wake_word)
-            print("Vosk recognizer initialized, wake word: '%s'" % self.wake_word)
+            # The model's prediction keys are the model names
+            model_names = list(self.oww_model.models.keys())
+            self.wake_word_name = model_names[0] if model_names else model_arg
+            logging.info("openWakeWord initialized, model: '%s'" % self.wake_word_name)
+            print("openWakeWord initialized, model: '%s'" % self.wake_word_name)
             return True
 
         except ImportError:
-            logging.error("vosk package not installed")
-            print("Warning: vosk package not installed - wake word unavailable")
+            logging.error("openwakeword package not installed")
+            print("Warning: openwakeword not installed - wake word unavailable")
             return False
         except Exception as e:
-            logging.error("Error initializing vosk: %s" % str(e))
-            print("Warning: vosk init failed: %s" % str(e))
+            logging.error("Error initializing openWakeWord: %s" % str(e))
+            print("Warning: openWakeWord init failed: %s" % str(e))
             return False
 
     def handle_start_wake_word(self):
-        """Start listening for wake word using local vosk ASR."""
+        """Start listening for wake word using openWakeWord."""
         if not self.mic:
             print("Microphone not available")
             return
@@ -308,7 +312,7 @@ class RobMicrophoneService:
             print("Microphone already in state: %s" % self.state)
             return
 
-        if not self._setup_vosk():
+        if not self._setup_wake_word():
             return
 
         self.mic.start_recording(self.output)
@@ -321,10 +325,11 @@ class RobMicrophoneService:
         self.wake_thread.start()
 
         self.state = WAKE_LISTENING
-        status = {'microphone': {'state': WAKE_LISTENING, 'wake_word': self.wake_word}}
+        status = {'microphone': {'state': WAKE_LISTENING,
+                                 'wake_word': self.wake_word_name}}
         self.broadcastQ.put(status)
-        logging.info("Microphone: now WAKE_LISTENING for '%s'" % self.wake_word)
-        print("Microphone: now WAKE_LISTENING for '%s'" % self.wake_word)
+        logging.info("Microphone: now WAKE_LISTENING for '%s'" % self.wake_word_name)
+        print("Microphone: now WAKE_LISTENING for '%s'" % self.wake_word_name)
 
     def handle_stop_wake_word(self):
         """Stop wake word listening."""
@@ -349,22 +354,29 @@ class RobMicrophoneService:
         print("Microphone: wake word stopped, now IDLE")
 
     def _wake_word_monitor(self):
-        """Background thread: feed audio to vosk, watch for wake word.
+        """Background thread: feed audio to openWakeWord, watch for wake word.
 
-        In WAKE_LISTENING state, runs local ASR on the audio stream. When
-        the wake word is detected, starts capturing the command that follows.
+        In WAKE_LISTENING state, feeds 16-bit PCM chunks to the openWakeWord
+        model. When confidence exceeds threshold, starts capturing the command.
         In WAKE_CAPTURING state, monitors for silence to end capture.
         """
+        import numpy as np
         from lbrsys.settings import (MIC_SILENCE_THRESHOLD, MIC_SILENCE_DURATION,
                                      MIC_MAX_CAPTURE_DURATION, MIC_SAMPLE_RATE)
         try:
-            from lbrsys.settings import MIC_VOSK_DEBUG
+            from lbrsys.settings import MIC_WAKE_WORD_THRESHOLD
         except ImportError:
-            MIC_VOSK_DEBUG = False
+            MIC_WAKE_WORD_THRESHOLD = 0.5
+        try:
+            from lbrsys.settings import MIC_WAKE_WORD_DEBUG
+        except ImportError:
+            MIC_WAKE_WORD_DEBUG = False
 
-        check_interval = 0.1
+        # openWakeWord expects 1280-sample (80ms) chunks at 16kHz
+        oww_chunk_samples = 1280
+        oww_chunk_bytes = oww_chunk_samples * 2  # 16-bit = 2 bytes/sample
+        check_interval = 0.08  # 80ms to match openWakeWord's native chunk size
         silence_start = None
-        chunk_bytes = int(MIC_SAMPLE_RATE * 2 * check_interval)  # bytes per interval
 
         while self.do_wake_listen:
             time.sleep(check_interval)
@@ -373,48 +385,35 @@ class RobMicrophoneService:
                 continue
 
             recent = self.output.ring_buffer.get_recent(check_interval)
-            if not recent or len(recent) < 4:
+            if not recent or len(recent) < oww_chunk_bytes:
                 continue
 
             if self.state == WAKE_LISTENING:
-                # Note: we always feed audio to vosk even during silence.
-                # Vosk is a streaming recognizer that needs continuous audio
-                # to maintain acoustic context. Gating on RMS silence can
-                # cause missed wake words when speech onset is quiet.
-                # If CPU becomes a concern, consider feeding zero-filled
-                # buffers during silence instead of skipping entirely.
+                # Convert raw PCM bytes to int16 numpy array for openWakeWord
+                audio_chunk = np.frombuffer(
+                    recent[:oww_chunk_bytes], dtype=np.int16
+                )
 
-                # Feed audio to vosk for local transcription
-                rms = self._calculate_rms(recent)
-                if self.vosk_recognizer.AcceptWaveform(recent):
-                    result = json.loads(self.vosk_recognizer.Result())
-                    text = result.get('text', '')
-                    if text:
-                        logging.debug("Vosk heard: '%s'" % text)
-                        if MIC_VOSK_DEBUG:
-                            print("Vosk final [rms=%d]: '%s'" % (rms, text))
-                    if self.wake_word in text.lower():
-                        logging.info("Wake word detected in: '%s'" % text)
-                        print("Wake word '%s' detected!" % self.wake_word)
-                        self.vosk_recognizer.Reset()
-                        self.output.start_capture()
-                        self.capture_start_time = time.time()
-                        self.state = WAKE_CAPTURING
-                        silence_start = None
-                else:
-                    # Check partial results too for faster response
-                    partial = json.loads(self.vosk_recognizer.PartialResult())
-                    partial_text = partial.get('partial', '')
-                    if MIC_VOSK_DEBUG and partial_text:
-                        print("Vosk partial [rms=%d]: '%s'" % (rms, partial_text))
-                    if self.wake_word in partial_text.lower():
-                        logging.info("Wake word detected in partial: '%s'" % partial_text)
-                        print("Wake word '%s' detected!" % self.wake_word)
-                        self.vosk_recognizer.Reset()
-                        self.output.start_capture()
-                        self.capture_start_time = time.time()
-                        self.state = WAKE_CAPTURING
-                        silence_start = None
+                # Get predictions from openWakeWord
+                predictions = self.oww_model.predict(audio_chunk)
+                score = predictions.get(self.wake_word_name, 0.0)
+
+                if MIC_WAKE_WORD_DEBUG:
+                    rms = self._calculate_rms(recent)
+                    if score > 0.01:
+                        print("WakeWord [rms=%d]: %s=%.3f" %
+                              (rms, self.wake_word_name, score))
+
+                if score >= MIC_WAKE_WORD_THRESHOLD:
+                    logging.info("Wake word detected: %s (score=%.3f)" %
+                                 (self.wake_word_name, score))
+                    print("Wake word '%s' detected! (score=%.3f)" %
+                          (self.wake_word_name, score))
+                    self.oww_model.reset()
+                    self.output.start_capture()
+                    self.capture_start_time = time.time()
+                    self.state = WAKE_CAPTURING
+                    silence_start = None
 
             elif self.state == WAKE_CAPTURING:
                 elapsed = time.time() - self.capture_start_time

@@ -357,6 +357,10 @@ class RobMicrophoneService:
         """
         from lbrsys.settings import (MIC_SILENCE_THRESHOLD, MIC_SILENCE_DURATION,
                                      MIC_MAX_CAPTURE_DURATION, MIC_SAMPLE_RATE)
+        try:
+            from lbrsys.settings import MIC_VOSK_DEBUG
+        except ImportError:
+            MIC_VOSK_DEBUG = False
 
         check_interval = 0.1
         silence_start = None
@@ -381,11 +385,14 @@ class RobMicrophoneService:
                 # buffers during silence instead of skipping entirely.
 
                 # Feed audio to vosk for local transcription
+                rms = self._calculate_rms(recent)
                 if self.vosk_recognizer.AcceptWaveform(recent):
                     result = json.loads(self.vosk_recognizer.Result())
                     text = result.get('text', '')
                     if text:
                         logging.debug("Vosk heard: '%s'" % text)
+                        if MIC_VOSK_DEBUG:
+                            print("Vosk final [rms=%d]: '%s'" % (rms, text))
                     if self.wake_word in text.lower():
                         logging.info("Wake word detected in: '%s'" % text)
                         print("Wake word '%s' detected!" % self.wake_word)
@@ -398,6 +405,8 @@ class RobMicrophoneService:
                     # Check partial results too for faster response
                     partial = json.loads(self.vosk_recognizer.PartialResult())
                     partial_text = partial.get('partial', '')
+                    if MIC_VOSK_DEBUG and partial_text:
+                        print("Vosk partial [rms=%d]: '%s'" % (rms, partial_text))
                     if self.wake_word in partial_text.lower():
                         logging.info("Wake word detected in partial: '%s'" % partial_text)
                         print("Wake word '%s' detected!" % self.wake_word)

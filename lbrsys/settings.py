@@ -60,7 +60,7 @@ CAMERA_SNAPSHOT_URL = f'{_cam_scheme}://localhost:{CAMERA_SERVICE_PORT}/snapshot
 
 # AI Service - set to True to enable the OpenAI-based AI service
 #   Requires environment variable ROBOT_OPENAI_API_KEY
-#   Optional: ROBOT_OPENAI_MODEL (default: gpt-4o)
+#   Optional: ROBOT_OPENAI_MODEL (default: gpt-5.2)
 AI_SERVICE = True
 
 # Microphone service
@@ -79,8 +79,12 @@ MIC_AUTO_WAKE_WORD = True              # Start wake word listening on service st
 # or a built-in model name. Falls back to 'hey_jarvis' if not set.
 # Built-in models: 'hey_jarvis', 'alexa', 'hey_mycroft', etc.
 MIC_WAKE_WORD_MODEL = os.getenv('OPEN_WAKE_WORD_MODEL', 'hey_jarvis')
-MIC_WAKE_WORD_THRESHOLD = 0.45          # Confidence threshold (0.0-1.0)
+MIC_WAKE_WORD_THRESHOLD = 0.45         # Confidence threshold (0.0-1.0)
 MIC_WAKE_WORD_DEBUG = False            # Log all openWakeWord scores to console
+MIC_WAKE_WORD_FEEDBACK = True          # Play audio tone on wake word detection
+MIC_WAKE_WORD_TONE_FREQ = 440         # Tone frequency in Hz (A4)
+MIC_WAKE_WORD_TONE_DURATION = 0.15    # Tone duration in seconds
+MIC_WAKE_WORD_TONE_DEVICE = 'pulse'   # ALSA playback device for tone (pulse for Bluetooth)
 
 # URL for experimental use of the Jitsi system for teleconferencing (not currently in use)
 jitsiURL = "https://meet.jit.si/bfrobotics"

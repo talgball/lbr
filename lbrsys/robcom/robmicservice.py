@@ -33,6 +33,7 @@ import os
 import sys
 import time
 import struct
+import math
 import logging
 import multiprocessing
 import threading
@@ -291,6 +292,29 @@ class RobMicrophoneService:
             self.wake_word_name = model_names[0] if model_names else model_arg
             logging.info("openWakeWord initialized, model: '%s'" % self.wake_word_name)
             print("openWakeWord initialized, model: '%s'" % self.wake_word_name)
+
+            # Pre-compute wake word feedback tone
+            self._wake_tone_pcm = None
+            self._wake_tone_device = 'pulse'
+            try:
+                from lbrsys.settings import (MIC_WAKE_WORD_FEEDBACK,
+                                             MIC_WAKE_WORD_TONE_FREQ,
+                                             MIC_WAKE_WORD_TONE_DURATION,
+                                             MIC_WAKE_WORD_TONE_DEVICE)
+                self._wake_feedback_enabled = MIC_WAKE_WORD_FEEDBACK
+                self._wake_tone_device = MIC_WAKE_WORD_TONE_DEVICE
+                if MIC_WAKE_WORD_FEEDBACK:
+                    self._wake_tone_pcm = self._generate_tone(
+                        MIC_WAKE_WORD_TONE_FREQ, MIC_WAKE_WORD_TONE_DURATION
+                    )
+                    logging.info("Wake word feedback tone ready "
+                                 "(freq=%dHz, dur=%.2fs, device=%s)" %
+                                 (MIC_WAKE_WORD_TONE_FREQ,
+                                  MIC_WAKE_WORD_TONE_DURATION,
+                                  self._wake_tone_device))
+            except ImportError:
+                self._wake_feedback_enabled = False
+
             return True
 
         except ImportError:
@@ -410,10 +434,30 @@ class RobMicrophoneService:
                     print("Wake word '%s' detected! (score=%.3f)" %
                           (self.wake_word_name, score))
                     self.oww_model.reset()
+
+                    # Play feedback tone on daemon thread
+                    if (self._wake_feedback_enabled
+                            and self._wake_tone_pcm is not None):
+                        threading.Thread(
+                            target=self._play_wake_tone,
+                            name="WakeTone",
+                            daemon=True,
+                        ).start()
+
                     self.output.start_capture()
                     self.capture_start_time = time.time()
                     self.state = WAKE_CAPTURING
+                    status = {'microphone': {
+                        'state': WAKE_CAPTURING,
+                        'wake_word_detected': self.wake_word_name,
+                    }}
+                    self.broadcastQ.put(status)
                     silence_start = None
+                # elif score >= MIC_WAKE_WORD_THRESHOLD * 0.8:
+                #     logging.info("Wake word nearly detected: %s (score=%.3f)" %
+                #                  (self.wake_word_name, score))
+                #     print("Wake word '%s' nearly detected! (score=%.3f)" %
+                #           (self.wake_word_name, score))
 
             elif self.state == WAKE_CAPTURING:
                 elapsed = time.time() - self.capture_start_time
@@ -537,6 +581,46 @@ class RobMicrophoneService:
             self.state = LISTENING
         else:
             self.state = IDLE
+
+    @staticmethod
+    def _generate_tone(freq, duration, sample_rate=16000, amplitude=0.5,
+                       pad_seconds=0.15):
+        """Render a sine wave as S16_LE PCM bytes with silence padding.
+
+        Bluetooth speakers buffer ~100-200ms before output begins,
+        so leading silence ensures the tone is audible.
+        """
+        pad_samples = int(sample_rate * pad_seconds)
+        tone_samples = int(sample_rate * duration)
+        total_samples = pad_samples + tone_samples + pad_samples
+        max_val = 32767 * amplitude
+        pcm = bytearray(total_samples * 2)
+        for i in range(tone_samples):
+            value = int(max_val * math.sin(2.0 * math.pi * freq * i / sample_rate))
+            struct.pack_into('<h', pcm, (pad_samples + i) * 2, value)
+        return bytes(pcm)
+
+    def _play_wake_tone(self):
+        """Play pre-computed wake word tone via ALSA playback. Runs on daemon thread."""
+        try:
+            import alsaaudio
+            device = alsaaudio.PCM(
+                channels=1, rate=16000,
+                format=alsaaudio.PCM_FORMAT_S16_LE,
+                periodsize=1024, device=self._wake_tone_device,
+            )
+            chunk_bytes = 1024 * 2  # 1024 samples * 2 bytes
+            offset = 0
+            while offset < len(self._wake_tone_pcm):
+                chunk = self._wake_tone_pcm[offset:offset + chunk_bytes]
+                device.write(chunk)
+                offset += chunk_bytes
+            device.close()
+            logging.info("Wake tone played successfully")
+            print("Wake tone played")
+        except Exception as e:
+            logging.warning("Wake tone playback failed: %s" % str(e))
+            print("Wake tone FAILED: %s" % str(e))
 
     @staticmethod
     def _calculate_rms(data):

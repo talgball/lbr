@@ -401,6 +401,7 @@ class RobMicrophoneService:
         oww_chunk_bytes = oww_chunk_samples * 2  # 16-bit = 2 bytes/sample
         check_interval = 0.08  # 80ms to match openWakeWord's native chunk size
         silence_start = None
+        ambient_rms = 0.0  # Running estimate of ambient noise floor
 
         while self.do_wake_listen:
             time.sleep(check_interval)
@@ -413,6 +414,13 @@ class RobMicrophoneService:
                 continue
 
             if self.state == WAKE_LISTENING:
+                # Update running ambient noise estimate
+                rms = self._calculate_rms(recent)
+                if ambient_rms == 0.0:
+                    ambient_rms = float(rms)
+                else:
+                    ambient_rms = 0.95 * ambient_rms + 0.05 * rms
+
                 # Convert raw PCM bytes to int16 numpy array for openWakeWord
                 audio_chunk = np.frombuffer(
                     recent[:oww_chunk_bytes], dtype=np.int16
@@ -423,10 +431,10 @@ class RobMicrophoneService:
                 score = predictions.get(self.wake_word_name, 0.0)
 
                 if MIC_WAKE_WORD_DEBUG:
-                    rms = self._calculate_rms(recent)
                     if score > 0.01:
-                        print("WakeWord [rms=%d]: %s=%.3f" %
-                              (rms, self.wake_word_name, score))
+                        print("WakeWord [rms=%d ambient=%d]: %s=%.3f" %
+                              (rms, int(ambient_rms), self.wake_word_name,
+                               score))
 
                 if score >= MIC_WAKE_WORD_THRESHOLD:
                     logging.info("Wake word detected: %s (score=%.3f)" %
@@ -463,6 +471,11 @@ class RobMicrophoneService:
                 elapsed = time.time() - self.capture_start_time
                 rms = self._calculate_rms(recent)
 
+                # Adaptive silence threshold: ambient noise floor + 50% margin,
+                # but never below the configured minimum
+                silence_threshold = max(MIC_SILENCE_THRESHOLD,
+                                        ambient_rms * 1.5)
+
                 if elapsed >= MIC_MAX_CAPTURE_DURATION:
                     logging.info("Max capture duration reached (%.1fs)" % elapsed)
                     print("Max capture duration reached")
@@ -471,12 +484,18 @@ class RobMicrophoneService:
                     silence_start = None
                     continue
 
-                if rms <= MIC_SILENCE_THRESHOLD:
+                if rms <= silence_threshold:
                     if silence_start is None:
                         silence_start = time.time()
+                        logging.debug(
+                            "Silence candidate started "
+                            "(rms=%d, threshold=%d, ambient=%d)" %
+                            (rms, int(silence_threshold), int(ambient_rms)))
                     elif time.time() - silence_start >= MIC_SILENCE_DURATION:
-                        logging.info("Silence timeout after wake word, "
-                                     "finalizing capture (%.1fs)" % elapsed)
+                        logging.info(
+                            "Silence timeout after wake word, "
+                            "finalizing capture (%.1fs, ambient_rms=%d)" %
+                            (elapsed, int(ambient_rms)))
                         print("Silence detected, finalizing capture")
                         self._finalize_capture()
                         self.state = WAKE_LISTENING
@@ -491,6 +510,7 @@ class RobMicrophoneService:
 
         check_interval = 0.1  # Check every 100ms
         silence_start = None
+        ambient_rms = 0.0  # Running estimate of ambient noise floor
 
         while self.do_monitor:
             time.sleep(check_interval)
@@ -506,8 +526,15 @@ class RobMicrophoneService:
             rms = self._calculate_rms(recent)
 
             if self.state == LISTENING:
-                if rms > MIC_SILENCE_THRESHOLD:
-                    logging.info("Voice activity detected (RMS=%d)" % rms)
+                # Update running ambient noise estimate
+                if ambient_rms == 0.0:
+                    ambient_rms = float(rms)
+                else:
+                    ambient_rms = 0.95 * ambient_rms + 0.05 * rms
+
+                if rms > max(MIC_SILENCE_THRESHOLD, ambient_rms * 2.0):
+                    logging.info("Voice activity detected (RMS=%d, ambient=%d)"
+                                 % (rms, int(ambient_rms)))
                     print("Voice activity detected (RMS=%d)" % rms)
                     self.output.start_capture()
                     self.capture_start_time = time.time()
@@ -516,6 +543,10 @@ class RobMicrophoneService:
 
             elif self.state == CAPTURING:
                 elapsed = time.time() - self.capture_start_time
+
+                # Adaptive silence threshold
+                silence_threshold = max(MIC_SILENCE_THRESHOLD,
+                                        ambient_rms * 1.5)
 
                 # Check max duration
                 if elapsed >= MIC_MAX_CAPTURE_DURATION:
@@ -526,11 +557,13 @@ class RobMicrophoneService:
                     continue
 
                 # Track silence for auto-stop
-                if rms <= MIC_SILENCE_THRESHOLD:
+                if rms <= silence_threshold:
                     if silence_start is None:
                         silence_start = time.time()
                     elif time.time() - silence_start >= MIC_SILENCE_DURATION:
-                        logging.info("Silence timeout, finalizing capture (%.1fs)" % elapsed)
+                        logging.info("Silence timeout, finalizing capture "
+                                     "(%.1fs, ambient_rms=%d)" %
+                                     (elapsed, int(ambient_rms)))
                         print("Silence detected, finalizing capture")
                         self._finalize_capture()
                         silence_start = None

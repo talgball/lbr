@@ -79,7 +79,7 @@ MIC_AUTO_WAKE_WORD = True              # Start wake word listening on service st
 # or a built-in model name. Falls back to 'hey_jarvis' if not set.
 # Built-in models: 'hey_jarvis', 'alexa', 'hey_mycroft', etc.
 MIC_WAKE_WORD_MODEL = os.getenv('OPEN_WAKE_WORD_MODEL', 'hey_jarvis')
-MIC_WAKE_WORD_THRESHOLD = 0.45         # Confidence threshold (0.0-1.0)
+MIC_WAKE_WORD_THRESHOLD = 0.1          # Confidence threshold (0.0-1.0)
 MIC_WAKE_WORD_DEBUG = False            # Log all openWakeWord scores to console
 MIC_WAKE_WORD_FEEDBACK = True          # Play audio tone on wake word detection
 MIC_WAKE_WORD_TONE_FREQ = 440         # Tone frequency in Hz (A4)

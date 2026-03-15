@@ -566,17 +566,18 @@ class RobAIService:
         """Check if the robot has stopped moving by examining motor current.
 
         Zero current on both motor channels is the definitive indicator
-        that the robot has stopped moving.
+        that the robot has stopped moving. Telemetry arrives as
+        'amperages' dict with 'leftMotor'/'rightMotor' keys.
         """
-        amps = self.state.get('Amps')
+        amps = self.state.get('amperages')
         if amps is None:
-            return True
+            return None  # No telemetry yet — unknown
 
         if isinstance(amps, dict):
-            ch1 = abs(amps.get('channel1', 0))
-            ch2 = abs(amps.get('channel2', 0))
+            ch1 = abs(amps.get('leftMotor', amps.get('channel1', 0)))
+            ch2 = abs(amps.get('rightMotor', amps.get('channel2', 0)))
         else:
-            return True
+            return None
 
         return ch1 == 0 and ch2 == 0
 
@@ -594,10 +595,11 @@ class RobAIService:
         start_time = time.time()
         startup_timeout = 5.0  # Max time to wait for motors to engage
 
-        # Phase 1: Wait for movement to start
+        # Phase 1: Wait for movement to start (non-zero current)
         while time.time() - start_time < startup_timeout:
             time.sleep(MOVEMENT_POLL_INTERVAL)
-            if not self._is_movement_complete():
+            status = self._is_movement_complete()
+            if status is False:  # Motors drawing current
                 logging.info("Movement started (%.1fs)" %
                              (time.time() - start_time))
                 break
@@ -606,10 +608,11 @@ class RobAIService:
                             startup_timeout)
             return True  # Command may have been a no-op
 
-        # Phase 2: Wait for movement to stop
+        # Phase 2: Wait for movement to stop (zero current)
         while time.time() - start_time < MOVEMENT_COMPLETE_TIMEOUT:
             time.sleep(MOVEMENT_POLL_INTERVAL)
-            if self._is_movement_complete():
+            status = self._is_movement_complete()
+            if status is True:  # Both channels at zero
                 logging.info("Movement complete (%.1fs)" %
                              (time.time() - start_time))
                 return True
@@ -716,13 +719,27 @@ class RobAIService:
             # previous_response_id, so we only send the new items.
             follow_up_input = tool_results
 
-            # Inject updated telemetry as a user message
+            # Inject updated telemetry with fresh camera snapshot
             telemetry_text = ("[Telemetry update after command execution]\n"
                               + json.dumps(self.state, indent=2, default=str))
-            follow_up_input.append({
-                "role": "user",
-                "content": telemetry_text,
-            })
+            snapshot_b64 = self._fetch_snapshot()
+            if snapshot_b64:
+                follow_up_input.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": telemetry_text},
+                        {
+                            "type": "input_image",
+                            "image_url": ("data:image/jpeg;base64,%s"
+                                          % snapshot_b64),
+                        },
+                    ],
+                })
+            else:
+                follow_up_input.append({
+                    "role": "user",
+                    "content": telemetry_text,
+                })
 
             # Refresh instructions with latest state
             instructions = self._build_instructions()

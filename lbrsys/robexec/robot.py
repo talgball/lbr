@@ -301,6 +301,14 @@ class Robot(object):
         if cmd == 'S' or cmd == 's':
             preparedCommand = power(0,0)
             return preparedCommand
+
+        if cmd == 'f':
+            preparedCommand = power(0.25, 0)
+            return preparedCommand
+
+        if cmd == 'b':
+            preparedCommand = power(0.25, 180)
+            return preparedCommand
         
         if cmd == 'Shutdown':
             return preparedCommand

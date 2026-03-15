@@ -695,9 +695,10 @@ class RobAIService:
                 if not completed:
                     logging.warning("Movement timed out, continuing anyway")
 
-            # Build follow-up input: model's output items + tool results
-            # + telemetry update
-            follow_up_input = list(response.output) + tool_results
+            # Build follow-up input: tool results + telemetry update.
+            # The model's output items are already known server-side via
+            # previous_response_id, so we only send the new items.
+            follow_up_input = tool_results
 
             # Inject updated telemetry as a user message
             telemetry_text = ("[Telemetry update after command execution]\n"

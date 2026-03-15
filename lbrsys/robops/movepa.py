@@ -41,6 +41,12 @@ class Movepa:
             # print(f"{curPower}")
             pass
 
+        # todo externalize using a method to set tweaks for individual robots
+        # This tweak is for lbr6a due to its wheel misalignment.
+        # Should probably be part of adjustTask instead of here
+        if a == 0.0 or a == 180:
+            a += 4.0
+
         if p > 1.0:
             p = 1.0
             print("Power clammped at 100%:", curPower.level)

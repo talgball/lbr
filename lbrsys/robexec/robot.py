@@ -210,7 +210,7 @@ class Robot(object):
                 continue
 
             # check to see if the command is external
-            if command and command[0] != '/' and command not in 'Ss' \
+            if command and command[0] != '/' and command not in 'Ssfb' \
                 and 'stop' not in command.lower():
                 if command in self.r.extcmds:
                     try:

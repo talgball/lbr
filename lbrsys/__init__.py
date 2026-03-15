@@ -182,4 +182,25 @@ def get_move_config(robot_id):
 robot_move_config = get_move_config(robot_id)
 # print(f"Move Configuration: {str(robot_move_config)}")
 
+
+def get_ai_notes(robot_id):
+    """Load active AI notes for a robot from the ai_notes table."""
+    notes = []
+    try:
+        with sqlite3.connect(dbfile) as con:
+            con.row_factory = sqlite3.Row
+            cursor = con.cursor()
+            rows = cursor.execute(
+                "SELECT category, note FROM ai_notes "
+                "WHERE robot_id=? AND active=1 ORDER BY category, note_id",
+                (robot_id,))
+            notes = [(row['category'], row['note']) for row in rows.fetchall()]
+    except Exception as e:
+        print(f"Error getting AI notes for robot {robot_name}: {e}")
+
+    return notes
+
+
+robot_ai_notes = get_ai_notes(robot_id)
+
 robot_calibrations = Calibration()

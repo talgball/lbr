@@ -6,15 +6,20 @@ executive via JoinableQueues.  It receives telemetry and AI requests on its
 commandQ and sends robot commands back through its broadcastQ, which the
 executive's monitor thread dispatches through normal type-based routing.
 
-The service uses OpenAI function calling (tools) so the model can issue
-structured robot commands (move, stop, speak, turn, etc.) that are translated
-to the same command strings used by the console and HTTP service.
+The service uses the OpenAI Responses API with function calling (tools) so the
+model can issue structured robot commands (move, stop, speak, turn, etc.) that
+are translated to the same command strings used by the console and HTTP service.
+
+Multi-turn conversation state is managed server-side via previous_response_id.
+For multi-step tasks (navigation), the service runs a sense-act loop: execute
+tool calls, wait for movement to complete (zero motor current), inject updated
+telemetry, and send the next turn to the model.
 """
 
 __author__ = "Tal G. Ball"
 __copyright__ = "Copyright (C) 2009-2026 Tal G. Ball"
 __license__ = "Apache License, Version 2.0"
-__version__ = "1.0"
+__version__ = "2.0"
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +39,7 @@ import sys
 import io
 import time
 import json
+import math
 import logging
 import multiprocessing
 import threading
@@ -42,7 +48,8 @@ import base64
 import urllib.request
 import ssl
 
-from lbrsys import ai_request, feedback, exec_report, mic_audio, set_process_title
+from lbrsys import (ai_request, feedback, exec_report, mic_audio,
+                     set_process_title, robot_move_config, robot_ai_notes)
 from lbrsys.settings import aiLogFile
 
 proc = multiprocessing.current_process()
@@ -54,6 +61,16 @@ if proc.name == "Robot AI Service":
         format='[%(levelname)s] (%(processName)-10s) %(message)s',
     )
     set_process_title()
+
+
+# Maximum iterations in the sense-act loop to prevent runaway API calls
+MAX_SENSE_ACT_ITERATIONS = 20
+
+# How long to wait for movement to complete before timing out (seconds)
+MOVEMENT_COMPLETE_TIMEOUT = 60.0
+
+# How often to check for movement completion (seconds)
+MOVEMENT_POLL_INTERVAL = 0.25
 
 
 SYSTEM_PROMPT = """You are the AI reasoning layer for a mobile robot called {robot_name}.
@@ -71,158 +88,179 @@ report to the console.
 If camera images are attached, they show the current view from the robot's
 active camera. Use them to understand the robot's surroundings when relevant.
 
+SAFETY CONSTRAINTS:
+- Always use bounded movements. Every navigate() call MUST include a range
+  and/or duration limit. Never issue open-ended movement commands.
+- Default power level is 0.25 (25%) unless the operator specifies otherwise
+  or you determine a lower level is warranted (e.g., tight spaces, nearby
+  obstacles, low visibility).
+- After issuing a movement command, you will receive updated telemetry when
+  the movement completes. Use this to verify progress before issuing the
+  next command.
+
+PHYSICAL CONFIGURATION:
+- Wheel diameter: {wheel_diameter} cm
+- Encoder counts per revolution: {counts_per_rev}
+- Distance per encoder count: {cm_per_count:.4f} cm
+- To calculate distance from encoder counts:
+  distance_cm = counts * {cm_per_count:.4f}
+
+{robot_notes}
+
 Current robot state:
 {state}
 """
 
+
 ROBOT_TOOLS = [
     {
         "type": "function",
-        "function": {
-            "name": "move",
-            "description": "Move the robot with specified power level and angle. "
-                           "Level is 0.0 to 1.0 (fraction of max power). "
-                           "Angle is degrees: 0=forward, 90=right, 180=backward, 270=left.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "level": {
-                        "type": "number",
-                        "description": "Power level from 0.0 to 1.0"
-                    },
-                    "angle": {
-                        "type": "integer",
-                        "description": "Direction in degrees (0=forward)"
-                    },
+        "name": "move",
+        "description": "Move the robot with specified power level and angle. "
+                       "Level is 0.0 to 1.0 (fraction of max power). "
+                       "Angle is degrees: 0=forward, 90=right, 180=backward, 270=left. "
+                       "WARNING: This does not stop automatically. Prefer navigate() "
+                       "with range/duration limits for safety.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "type": "number",
+                    "description": "Power level from 0.0 to 1.0"
                 },
-                "required": ["level", "angle"]
-            }
-        }
+                "angle": {
+                    "type": "integer",
+                    "description": "Direction in degrees (0=forward)"
+                },
+            },
+            "required": ["level", "angle"],
+            "additionalProperties": False,
+        },
+        "strict": True,
     },
     {
         "type": "function",
-        "function": {
-            "name": "stop",
-            "description": "Stop all movement immediately.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            }
-        }
+        "name": "stop",
+        "description": "Stop all movement immediately.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+        "strict": True,
     },
     {
         "type": "function",
-        "function": {
-            "name": "speak",
-            "description": "Say something through the robot's speech system.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "description": "The text to speak"
-                    }
-                },
-                "required": ["message"]
-            }
-        }
+        "name": "speak",
+        "description": "Say something through the robot's speech system.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "The text to speak"
+                }
+            },
+            "required": ["message"],
+            "additionalProperties": False,
+        },
+        "strict": True,
     },
     {
         "type": "function",
-        "function": {
-            "name": "turn",
-            "description": "Execute a turn by specified degrees. "
-                           "Positive = clockwise, negative = counter-clockwise.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "angle": {
-                        "type": "number",
-                        "description": "Degrees to turn"
-                    }
-                },
-                "required": ["angle"]
-            }
-        }
+        "name": "turn",
+        "description": "Execute a turn by specified degrees. "
+                       "Positive = clockwise, negative = counter-clockwise.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "angle": {
+                    "type": "number",
+                    "description": "Degrees to turn"
+                }
+            },
+            "required": ["angle"],
+            "additionalProperties": False,
+        },
+        "strict": True,
     },
     {
         "type": "function",
-        "function": {
-            "name": "navigate_to_heading",
-            "description": "Turn to face an absolute compass heading (0-360 degrees).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "heading": {
-                        "type": "number",
-                        "description": "Target compass heading in degrees"
-                    }
-                },
-                "required": ["heading"]
-            }
-        }
+        "name": "navigate_to_heading",
+        "description": "Turn to face an absolute compass heading (0-360 degrees).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "heading": {
+                    "type": "number",
+                    "description": "Target compass heading in degrees"
+                }
+            },
+            "required": ["heading"],
+            "additionalProperties": False,
+        },
+        "strict": True,
     },
     {
         "type": "function",
-        "function": {
-            "name": "navigate",
-            "description": "Move the robot with specified power, angle, range, sensor, "
-                           "and/or duration. Use this instead of 'move' when you want "
-                           "the robot to move for a specific duration or distance. "
-                           "The robot will stop automatically when the range or duration "
-                           "limit is reached.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "level": {
-                        "type": "number",
-                        "description": "Power level from 0.0 to 1.0"
-                    },
-                    "angle": {
-                        "type": "integer",
-                        "description": "Direction in degrees (0=forward)"
-                    },
-                    "range": {
-                        "type": "integer",
-                        "description": "Distance limit in cm (0 = no limit)",
-                        "default": 0
-                    },
-                    "sensor": {
-                        "type": "string",
-                        "description": "Range sensor direction to monitor: "
-                                       "Forward, Back, Left, or Right",
-                        "enum": ["Forward", "Back", "Left", "Right"],
-                        "default": "Forward"
-                    },
-                    "duration": {
-                        "type": "integer",
-                        "description": "Time limit in seconds (0 = no limit)",
-                        "default": 0
-                    },
+        "name": "navigate",
+        "description": "Move the robot with specified power, angle, range, sensor, "
+                       "and/or duration. This is the preferred movement command. "
+                       "The robot will stop automatically when the range or duration "
+                       "limit is reached. Always specify at least a range or duration.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "type": "number",
+                    "description": "Power level from 0.0 to 1.0 (default 0.25)"
                 },
-                "required": ["level", "angle"]
-            }
-        }
+                "angle": {
+                    "type": "integer",
+                    "description": "Direction in degrees (0=forward)"
+                },
+                "range": {
+                    "type": "integer",
+                    "description": "Distance limit in cm (0 = no limit)"
+                },
+                "sensor": {
+                    "type": "string",
+                    "description": "Range sensor direction to monitor: "
+                                   "Forward, Back, Left, or Right",
+                    "enum": ["Forward", "Back", "Left", "Right"],
+                },
+                "duration": {
+                    "type": "integer",
+                    "description": "Time limit in seconds (0 = no limit)"
+                },
+            },
+            "required": ["level", "angle", "range", "sensor", "duration"],
+            "additionalProperties": False,
+        },
+        "strict": True,
     },
     {
         "type": "function",
-        "function": {
-            "name": "report",
-            "description": "Send a text report to the robot's console/operator. "
-                           "Use this for information that should be displayed, not spoken.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "description": "The report text"
-                    }
-                },
-                "required": ["message"]
-            }
-        }
+        "name": "report",
+        "description": "Send a text report to the robot's console/operator. "
+                       "Use this for information that should be displayed, not spoken.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "The report text"
+                }
+            },
+            "required": ["message"],
+            "additionalProperties": False,
+        },
+        "strict": True,
     },
 ]
+
+# Tools that trigger robot movement and require waiting for completion
+MOVEMENT_TOOLS = {'move', 'navigate', 'turn', 'navigate_to_heading'}
 
 
 def execute_tool_call(tool_name, arguments, broadcastQ):
@@ -251,7 +289,8 @@ def execute_tool_call(tool_name, arguments, broadcastQ):
         range_limit = int(arguments.get("range", 0))
         sensor = arguments.get("sensor", "Forward")
         duration = int(arguments.get("duration", 0))
-        command = "/r/%.2f/%d/%d/%s/%d" % (level, angle, range_limit, sensor, duration)
+        command = "/r/%.2f/%d/%d/%s/%d" % (level, angle, range_limit,
+                                            sensor, duration)
 
     elif tool_name == "navigate_to_heading":
         heading = float(arguments["heading"])
@@ -272,6 +311,16 @@ def execute_tool_call(tool_name, arguments, broadcastQ):
         return "Unknown tool: %s" % tool_name
 
 
+def _format_robot_notes(notes):
+    """Format robot AI notes for inclusion in the system prompt."""
+    if not notes:
+        return ""
+    lines = ["ROBOT-SPECIFIC NOTES:"]
+    for category, note in notes:
+        lines.append("- [%s] %s" % (category, note))
+    return "\n".join(lines)
+
+
 class RobAIService:
     def __init__(self, commandQ=None, broadcastQ=None):
         print("Process Name is %s" % multiprocessing.current_process().name)
@@ -280,9 +329,7 @@ class RobAIService:
         self.client = None
         self.model = None
         self.state = {}
-        self.conversation = []
-        self.request_thread = None
-        self.request_queue = queue.Queue()
+        self.last_response_id = None
 
         self.setup_client()
         self.start()
@@ -291,21 +338,26 @@ class RobAIService:
         """Initialize OpenAI client from environment variables."""
         try:
             from openai import OpenAI
-            api_key = os.environ.get('ROBOT_OPENAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
+            api_key = (os.environ.get('ROBOT_OPENAI_API_KEY')
+                       or os.environ.get('OPENAI_API_KEY'))
             if not api_key:
-                logging.error("Neither ROBOT_OPENAI_API_KEY or OPENAI_API_KEY are set")
-                print("Warning: ROBOT_OPENAI_API_KEY not set - AI service will not "
-                      "be able to process requests")
+                logging.error("Neither ROBOT_OPENAI_API_KEY or "
+                              "OPENAI_API_KEY are set")
+                print("Warning: ROBOT_OPENAI_API_KEY not set - AI service "
+                      "will not be able to process requests")
                 return
 
             self.client = OpenAI(api_key=api_key)
             self.model = os.environ.get('ROBOT_OPENAI_MODEL', 'gpt-5.2')
-            logging.info("AI service initialized with model: %s" % self.model)
-            print("AI service initialized with model: %s" % self.model)
+            logging.info("AI service initialized with model: %s (Responses API)"
+                         % self.model)
+            print("AI service initialized with model: %s (Responses API)"
+                  % self.model)
 
         except ImportError:
             logging.error("openai package not installed")
-            print("Warning: openai package not installed - AI service unavailable")
+            print("Warning: openai package not installed - "
+                  "AI service unavailable")
         except Exception as e:
             logging.error("Error initializing AI client: %s" % str(e))
             print("Warning: Error initializing AI client: %s" % str(e))
@@ -359,6 +411,15 @@ class RobAIService:
             self.broadcastQ.put(exec_report('ai', msg))
             return
 
+        # Handle reset command
+        if request.prompt.strip().lower() == 'reset':
+            self.last_response_id = None
+            msg = "AI conversation reset"
+            logging.info(msg)
+            print(msg)
+            self.broadcastQ.put(exec_report('ai', msg))
+            return
+
         logging.info("AI request: %s" % request.prompt)
         print("AI processing: %s" % request.prompt)
 
@@ -378,7 +439,8 @@ class RobAIService:
         through the normal AI request pipeline for reasoning and action.
         """
         logging.info("Received audio: %.1fs, source=%s, %d bytes" %
-                     (audio_msg.duration, audio_msg.source, len(audio_msg.audio_data)))
+                     (audio_msg.duration, audio_msg.source,
+                      len(audio_msg.audio_data)))
         print("AI service received audio: %.1fs from %s" %
               (audio_msg.duration, audio_msg.source))
         self.state['last_audio'] = {
@@ -402,7 +464,8 @@ class RobAIService:
         t.start()
 
     def _transcribe_and_process(self, audio_msg):
-        """Worker thread: transcribe audio via Whisper, then process as AI request."""
+        """Worker thread: transcribe audio via Whisper, then process as
+        AI request."""
         try:
             audio_file = io.BytesIO(audio_msg.audio_data)
             audio_file.name = "audio.wav"
@@ -434,10 +497,12 @@ class RobAIService:
             self.broadcastQ.put(exec_report('ai_error', error_msg))
 
     def _fetch_snapshot(self):
-        """Fetch JPEG snapshot from camera service. Returns base64 string or None."""
+        """Fetch JPEG snapshot from camera service.
+        Returns base64 string or None."""
         cameras = self.state.get('cameras', {})
         active = [n for n, info in cameras.items()
-                  if n != 'off' and isinstance(info, dict) and info.get('status') == 'on']
+                  if n != 'off' and isinstance(info, dict)
+                  and info.get('status') == 'on']
 
         if not active:
             return None
@@ -459,110 +524,217 @@ class RobAIService:
             logging.warning("Failed to fetch snapshot: %s" % str(e))
             return None
 
-    def _call_openai(self, request):
-        """Worker thread: call OpenAI API and process the response."""
+    def _build_instructions(self):
+        """Build the system prompt with current state and robot config."""
         try:
             from lbrsys.settings import robot_name
         except ImportError:
             robot_name = 'lbr'
 
-        system_message = SYSTEM_PROMPT.format(
+        wheel_diameter = robot_move_config.wheel_diameter
+        counts_per_rev = robot_move_config.counts_per_rev
+        if counts_per_rev > 0:
+            cm_per_count = (math.pi * wheel_diameter) / counts_per_rev
+        else:
+            cm_per_count = 0.0
+
+        return SYSTEM_PROMPT.format(
             robot_name=robot_name,
-            state=json.dumps(self.state, indent=2, default=str)
+            wheel_diameter=wheel_diameter,
+            counts_per_rev=counts_per_rev,
+            cm_per_count=cm_per_count,
+            robot_notes=_format_robot_notes(robot_ai_notes),
+            state=json.dumps(self.state, indent=2, default=str),
         )
 
-        messages = [
-            {"role": "system", "content": system_message},
-        ]
-
-        # Include recent conversation history for context, ensuring we don't
-        # slice into the middle of a tool_calls/tool response sequence
-        history = self.conversation[-10:]
-        while history and history[0].get('role') == 'tool':
-            history = history[1:]
-        messages.extend(history)
-
-        # Add the new user message, with camera snapshot if available
+    def _build_user_input(self, prompt):
+        """Build user input items, with camera snapshot if available."""
         snapshot_b64 = self._fetch_snapshot()
 
         if snapshot_b64:
-            user_message = {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": request.prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{snapshot_b64}"
-                        }
-                    }
-                ]
-            }
+            return [
+                {"type": "input_text", "text": prompt},
+                {
+                    "type": "input_image",
+                    "image_url": "data:image/jpeg;base64,%s" % snapshot_b64,
+                },
+            ]
         else:
-            user_message = {"role": "user", "content": request.prompt}
+            return prompt
 
-        # Store text-only in conversation history (avoid memory bloat from base64)
-        conversation_message = {"role": "user", "content": request.prompt}
-        messages.append(user_message)
-        self.conversation.append(conversation_message)
+    def _is_movement_complete(self):
+        """Check if the robot has stopped moving by examining motor current.
+
+        Zero current on both motor channels is the definitive indicator
+        that the robot has stopped moving.
+        """
+        amps = self.state.get('Amps')
+        if amps is None:
+            return True
+
+        if isinstance(amps, dict):
+            ch1 = abs(amps.get('channel1', 0))
+            ch2 = abs(amps.get('channel2', 0))
+        else:
+            return True
+
+        return ch1 == 0 and ch2 == 0
+
+    def _wait_for_movement_complete(self):
+        """Wait for the robot to finish moving.
+
+        Polls motor current telemetry until both channels read zero,
+        or timeout is reached. Returns True if movement completed,
+        False on timeout.
+        """
+        start_time = time.time()
+        # Brief initial delay to let the command reach the motors
+        time.sleep(0.5)
+
+        while time.time() - start_time < MOVEMENT_COMPLETE_TIMEOUT:
+            if self._is_movement_complete():
+                logging.info("Movement complete (%.1fs)" %
+                             (time.time() - start_time))
+                return True
+            time.sleep(MOVEMENT_POLL_INTERVAL)
+
+        logging.warning("Movement completion timeout (%.1fs)" %
+                        MOVEMENT_COMPLETE_TIMEOUT)
+        return False
+
+    def _call_openai(self, request):
+        """Worker thread: call OpenAI Responses API and process the response.
+
+        Implements a sense-act loop for multi-step tasks: after executing
+        tool calls that involve movement, waits for movement to complete,
+        then feeds updated telemetry back to the model for the next decision.
+        """
+        instructions = self._build_instructions()
+        user_input = self._build_user_input(request.prompt)
+
+        input_items = [{"role": "user", "content": user_input}]
 
         try:
-            response = self.client.chat.completions.create(
+            response = self.client.responses.create(
                 model=self.model,
-                messages=messages,
+                instructions=instructions,
+                input=input_items,
                 tools=ROBOT_TOOLS,
+                previous_response_id=self.last_response_id,
+                store=True,
             )
 
-            message = response.choices[0].message
-
-            # Process tool calls if any
-            if message.tool_calls:
-                # Track the assistant message with tool calls
-                self.conversation.append({
-                    "role": "assistant",
-                    "content": message.content,
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.function.name,
-                                "arguments": tc.function.arguments,
-                            }
-                        }
-                        for tc in message.tool_calls
-                    ]
-                })
-
-                for tool_call in message.tool_calls:
-                    fn_name = tool_call.function.name
-                    fn_args = json.loads(tool_call.function.arguments)
-                    logging.info("AI tool call: %s(%s)" % (fn_name, str(fn_args)))
-
-                    result = execute_tool_call(fn_name, fn_args, self.broadcastQ)
-
-                    self.conversation.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": result,
-                    })
-
-            # If the model also produced text content, report it
-            if message.content:
-                logging.info("AI response: %s" % message.content)
-                self.broadcastQ.put(exec_report('ai', message.content))
-
-                if not message.tool_calls:
-                    self.conversation.append({
-                        "role": "assistant",
-                        "content": message.content,
-                    })
+            self.last_response_id = response.id
+            self._process_response(response)
 
         except Exception as e:
             error_msg = "AI request error: %s" % str(e)
             logging.error(error_msg)
             print(error_msg)
             self.broadcastQ.put(exec_report('ai_error', str(e)))
+
+    def _process_response(self, response):
+        """Process a Responses API response, running the sense-act loop
+        if tool calls are present.
+
+        For single-step responses (text only, or non-movement tool calls),
+        executes immediately and returns.
+
+        For movement tool calls, executes the command, waits for completion,
+        injects updated telemetry, and sends a follow-up request to the model.
+        Repeats until the model produces a final text response with no
+        further tool calls or the iteration limit is reached.
+        """
+        iteration = 0
+
+        while iteration < MAX_SENSE_ACT_ITERATIONS:
+            iteration += 1
+
+            # Separate tool calls from text output
+            function_calls = [item for item in response.output
+                              if item.type == "function_call"]
+            text_items = [item for item in response.output
+                          if item.type == "message"]
+
+            # Report any text content to the operator
+            for item in text_items:
+                for content in item.content:
+                    if content.type == "output_text" and content.text:
+                        logging.info("AI response: %s" % content.text)
+                        self.broadcastQ.put(exec_report('ai', content.text))
+
+            if not function_calls:
+                # No tool calls — task complete
+                break
+
+            # Execute all tool calls and collect results
+            tool_results = []
+            has_movement = False
+
+            for fc in function_calls:
+                fn_name = fc.name
+                fn_args = json.loads(fc.arguments)
+                logging.info("AI tool call [iter %d]: %s(%s)" %
+                             (iteration, fn_name, str(fn_args)))
+
+                result = execute_tool_call(fn_name, fn_args, self.broadcastQ)
+
+                tool_results.append({
+                    "type": "function_call_output",
+                    "call_id": fc.call_id,
+                    "output": result,
+                })
+
+                if fn_name in MOVEMENT_TOOLS:
+                    has_movement = True
+
+            # If movement was commanded, wait for it to complete
+            if has_movement:
+                logging.info("Waiting for movement to complete...")
+                completed = self._wait_for_movement_complete()
+                if not completed:
+                    logging.warning("Movement timed out, continuing anyway")
+
+            # Build follow-up input: model's output items + tool results
+            # + telemetry update
+            follow_up_input = list(response.output) + tool_results
+
+            # Inject updated telemetry as a user message
+            telemetry_text = ("[Telemetry update after command execution]\n"
+                              + json.dumps(self.state, indent=2, default=str))
+            follow_up_input.append({
+                "role": "user",
+                "content": telemetry_text,
+            })
+
+            # Refresh instructions with latest state
+            instructions = self._build_instructions()
+
+            try:
+                response = self.client.responses.create(
+                    model=self.model,
+                    instructions=instructions,
+                    input=follow_up_input,
+                    tools=ROBOT_TOOLS,
+                    previous_response_id=self.last_response_id,
+                    store=True,
+                )
+
+                self.last_response_id = response.id
+
+            except Exception as e:
+                error_msg = ("AI sense-act loop error (iter %d): %s" %
+                             (iteration, str(e)))
+                logging.error(error_msg)
+                print(error_msg)
+                self.broadcastQ.put(exec_report('ai_error', str(e)))
+                break
+        else:
+            msg = ("AI sense-act loop reached max iterations (%d)" %
+                   MAX_SENSE_ACT_ITERATIONS)
+            logging.warning(msg)
+            print(msg)
+            self.broadcastQ.put(exec_report('ai', msg))
 
     def update_state_from_feedback(self, task):
         """Accumulate telemetry from feedback messages into state snapshot.
@@ -609,8 +781,10 @@ class RobAIService:
 
 
 if __name__ == '__main__':
-    sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
-    sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+    sys.path.insert(1, os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '../')))
+    sys.path.insert(2, os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '../../')))
 
     multiprocessing.set_start_method('spawn')
     cq = multiprocessing.JoinableQueue()
@@ -635,7 +809,8 @@ if __name__ == '__main__':
     )
     p.start()
 
-    print("AI Service test harness. Type a prompt or 'quit' to exit.")
+    print("AI Service test harness (Responses API).")
+    print("Type a prompt, 'reset' to clear conversation, or 'quit' to exit.")
     while True:
         try:
             prompt = input("AI> ")

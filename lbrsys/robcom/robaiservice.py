@@ -583,20 +583,36 @@ class RobAIService:
     def _wait_for_movement_complete(self):
         """Wait for the robot to finish moving.
 
-        Polls motor current telemetry until both channels read zero,
-        or timeout is reached. Returns True if movement completed,
-        False on timeout.
+        Two phases:
+        1. Wait for movement to START (non-zero motor current). This avoids
+           a false positive where current is still 0 because the command
+           hasn't reached the motors yet.
+        2. Wait for movement to STOP (zero current on both channels).
+
+        Returns True if movement completed, False on timeout.
         """
         start_time = time.time()
-        # Brief initial delay to let the command reach the motors
-        time.sleep(0.5)
+        startup_timeout = 5.0  # Max time to wait for motors to engage
 
+        # Phase 1: Wait for movement to start
+        while time.time() - start_time < startup_timeout:
+            time.sleep(MOVEMENT_POLL_INTERVAL)
+            if not self._is_movement_complete():
+                logging.info("Movement started (%.1fs)" %
+                             (time.time() - start_time))
+                break
+        else:
+            logging.warning("Motors did not engage within %.1fs" %
+                            startup_timeout)
+            return True  # Command may have been a no-op
+
+        # Phase 2: Wait for movement to stop
         while time.time() - start_time < MOVEMENT_COMPLETE_TIMEOUT:
+            time.sleep(MOVEMENT_POLL_INTERVAL)
             if self._is_movement_complete():
                 logging.info("Movement complete (%.1fs)" %
                              (time.time() - start_time))
                 return True
-            time.sleep(MOVEMENT_POLL_INTERVAL)
 
         logging.warning("Movement completion timeout (%.1fs)" %
                         MOVEMENT_COMPLETE_TIMEOUT)

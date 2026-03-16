@@ -30,6 +30,7 @@ __version__ = "1.0"
 // #define SENSOR_TIMEOUT 50000 // mb1220 pw up to 58*765us
 #define SENSOR_TIMEOUT 100000 // mb1220 pw up to 58*765us
 #define SPEED_OF_SOUND 58    // mb1220 returns round trip time (2*29us/cm)
+#define INTER_SENSOR_DELAY 10 // ms between sensor reads for echo dissipation
 
 typedef struct Sensor {
   const char *name;
@@ -105,7 +106,7 @@ void loop() {
       }
       
       sensors[i].distance = get_distance(&sensors[i]);
-      // delay(100); // not needed after we install the rest of the sensors
+      delay(INTER_SENSOR_DELAY);
     }
   
     report_sensors(sensors, deltat);
@@ -117,18 +118,20 @@ void loop() {
 
 
 unsigned long get_distance(Sensor *s) {
-  
+  unsigned long pulse;
+
   // Trigger a ping
   digitalWrite(s->ctrlPin, HIGH);
   delayMicroseconds(SENSOR_TRIGGER_PW);
-  digitalWrite(s->ctrlPin, LOW); 
+  digitalWrite(s->ctrlPin, LOW);
 
-  // Read the ping
-  s->distance = pulseIn(s->pingPin, HIGH, SENSOR_TIMEOUT) / SPEED_OF_SOUND;
+  // Read the ping.  pulseIn returns 0 on timeout — retain the previous
+  // reading rather than reporting 0 (which is below MB1220 minimum range).
+  pulse = pulseIn(s->pingPin, HIGH, SENSOR_TIMEOUT);
+  if (pulse > 0) {
+    s->distance = pulse / SPEED_OF_SOUND;
+  }
 
-
-  // delayMicroseconds(SENSOR_TRIGGER_PW);  // remove this line when "real" process above is enabled
- 
   return(s->distance);
 }
 

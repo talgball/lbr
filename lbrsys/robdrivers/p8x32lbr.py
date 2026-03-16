@@ -58,6 +58,10 @@ class P8X32:
     defaultRangeLine = b'{"Ranges":{"Forward":-1,"Bottom":-1,"Left":-1,"Right":-1,"Back":-1,"Deltat":0}}'
     rangeInit = json.loads(defaultRangeLine.decode())
 
+    # MB1220 minimum range is ~20cm; 0 is physically impossible and indicates
+    # a read error.  Bottom is excluded since 0 can be a valid floor reading.
+    rangeSensors = ['Forward', 'Left', 'Right', 'Back']
+
     def __init__(self):
         try:
             self.controller = serial.Serial(self.port, self.baudrate, self.bytesize,
@@ -66,10 +70,12 @@ class P8X32:
         except:
             print("Unexpected error:", sys.exc_info()[0])
             raise
-        
+
         self.messagePub = publisher.Publisher("P8X32 Message Publisher")
         self.rangePub   = publisher.Publisher("P8X32-MB1220 Range Publisher")
         self.ranges     = self.rangeInit
+        self.lastValidRanges = {}  # sensor -> last known good value
+        self.zeroFilterCount = 0
         self.qDepth     = 500  # number of range readings to keep
         self.rangeList  = deque(maxlen=self.qDepth)
         self.t0         = time.time()
@@ -92,9 +98,25 @@ class P8X32:
             # in case we don't get a line or are in debug mode
             if not rangeLine:
                 rangeLine = self.defaultRangeLine
-                
+
             self.ranges = json.loads(rangeLine.decode())
             self.ranges["Timestamp"] = t
+
+            # Filter spurious zeros: 0 is below MB1220 minimum range (~20cm)
+            # and indicates a read error.  Replace with last valid reading.
+            if 'Ranges' in self.ranges:
+                ranges = self.ranges['Ranges']
+                for sensor in self.rangeSensors:
+                    if sensor in ranges:
+                        if ranges[sensor] == 0 and sensor in self.lastValidRanges:
+                            ranges[sensor] = self.lastValidRanges[sensor]
+                            self.zeroFilterCount += 1
+                            print(f"Filtered zero on {sensor}, "
+                                  f"substituted {self.lastValidRanges[sensor]} "
+                                  f"(total filtered: {self.zeroFilterCount})"
+                                  f"  raw: {rangeLine}")
+                        elif ranges[sensor] > 0:
+                            self.lastValidRanges[sensor] = ranges[sensor]
 
             goodRead = True
             self.rangePub.publish(self.ranges)

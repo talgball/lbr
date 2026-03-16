@@ -106,8 +106,8 @@ class Opsmgr(object):
         self.lastPower          = power(0., 0.)
         self.autoAdjust         = True  # False means don't adjust for range
 
-        self.lastRanges         = {'Ranges':{'Forward':0,'Left':0,'Right':0,
-                                             'Bottom':0,'Back':0,'Deltat':0},
+        self.lastRanges         = {'Ranges':{'Forward':-1,'Left':-1,'Right':-1,
+                                             'Bottom':-1,'Back':-1,'Deltat':0},
                                    'Timestamp':0.0}
 
         self.lastMpu            = mpuData(gyro(0, 0, 0, 0), accel(0, 0, 0), mag(0, 0, 0),

@@ -120,7 +120,8 @@ class Rangeservice(object):
                             msg['Ranges']['Left'],
                             msg['Ranges']['Right'],
                             msg['Ranges']['Back'],
-                            msg['Ranges']['Deltat']  / 80000000.0 * 1000.0,
+                            # msg['Ranges']['Deltat']  / 80000000.0 * 1000.0,
+                            msg['Ranges']['Deltat'],  # already milliseconds for lbr6
                             msg['Timestamp'] * 1000.0))
             
             self.lastLogTime = robtimer()

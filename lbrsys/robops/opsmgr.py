@@ -34,7 +34,7 @@ from lbrsys import power, nav, voltages, amperages, count
 from lbrsys import gyro, accel, mag, mpuData
 from lbrsys import observeTurn, executeTurn, observeHeading, executeHeading
 from lbrsys import calibrateMagnetometer
-from lbrsys import observeRange, feedback
+from lbrsys import observeRange, cancelRange, observeResult, feedback
 
 import robdrivers
 import robdrivers.sdc2130
@@ -53,6 +53,28 @@ if multiprocessing.current_process().name == "Robot Operations":
         filename=opsLogFile,
         format='[%(levelname)s] (%(processName)-10s) %(message)s'
     )
+
+
+class NavSession:
+    """Coordinates range condition and timer for a single nav command.
+    Ensures whichever limiter fires first cancels the other."""
+    _counter = 0
+
+    def __init__(self):
+        NavSession._counter += 1
+        self.nav_id = "nav_%d_%.3f" % (NavSession._counter, robtimer())
+        self.completed = False
+        self.timer = None
+
+    def finish(self):
+        """Called by whichever limiter fires first."""
+        if self.completed:
+            return False  # already finished by the other limiter
+        self.completed = True
+        if self.timer is not None:
+            self.timer.cancel()
+            self.timer = None
+        return True
 
 
 class Opsmgr(object):
@@ -105,6 +127,7 @@ class Opsmgr(object):
         self.adjustedTask       = power(0., 0.)
         self.lastPower          = power(0., 0.)
         self.autoAdjust         = True  # False means don't adjust for range
+        self.nav_sessions       = {}    # nav_id -> NavSession
 
         self.lastRanges         = {'Ranges':{'Forward':-1,'Left':-1,'Right':-1,
                                              'Bottom':-1,'Back':-1,'Deltat':0},
@@ -164,15 +187,18 @@ class Opsmgr(object):
             #print str(result)
 
         if type(task) is nav:
-            # nav: power, range, interval
+            session = NavSession()
+            self.nav_sessions[session.nav_id] = session
             self.commandQ.put(task.power)
-            # todo handle the case of having both range and duration wrt to priorities and cross management
+
             if task.range != 0:
-                self.rangecq.put(observeRange(task))
+                self.rangecq.put(observeRange(task, nav_id=session.nav_id))
+
             if task.interval != 0:
-                i = threading.Timer(task.interval, self.intervalStopCallback,
-                                    kwargs={'task': task})
-                i.start()
+                t = threading.Timer(task.interval, self.intervalStopCallback,
+                                    kwargs={'task': task, 'session': session})
+                session.timer = t
+                t.start()
 
         if type(task) is mpuData:
             self.mpuData = task
@@ -217,7 +243,21 @@ class Opsmgr(object):
         #     result = robapps.danceapp.DanceApp(dance, self.mover)
         #     logging.debug(str(result))
 
-        if type(task) is tuple and len(task) == 3:  # todo need to make an observation type
+        if type(task) is observeResult:
+            session = self.nav_sessions.get(task.nav_id)
+            if session and session.finish():
+                # range condition fired first — cancel timer, stop motors
+                del self.nav_sessions[task.nav_id]
+                self.commandQ.put(power(0, 0))
+                msg = "Range %s: sensor=%s, value=%.1f — stopping motors" % (
+                    task.status, task.sensor, task.value)
+                logging.info(msg)
+                print(msg)
+            else:
+                logging.debug("Ignoring stale observeResult nav_id=%s" % task.nav_id)
+
+        # legacy support for gyro observer results (still uses anonymous tuples)
+        if type(task) is tuple and len(task) == 3:
             if task[0] == 'Observed':
                 self.commandQ.put(power(0, 0))
                 logging.debug("Stopped motors on completed observation")
@@ -356,7 +396,18 @@ class Opsmgr(object):
                 logging.debug("Error reporting mpu data: %s" % (str(e)))
 
 
-    def intervalStopCallback(self, task):
+    def intervalStopCallback(self, task, session=None):
+        if session is not None:
+            if not session.finish():
+                logging.debug("Timer expired but nav already completed, nav_id=%s" %
+                              session.nav_id)
+                return
+            # timer fired first — cancel the range condition
+            if task.range != 0:
+                self.rangecq.put(cancelRange(session.nav_id))
+            if session.nav_id in self.nav_sessions:
+                del self.nav_sessions[session.nav_id]
+
         msg = "Stopping motors after interval %.3f" % task.interval
         print(msg)
         logging.info(msg)

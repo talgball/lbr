@@ -189,11 +189,14 @@ class MPservice(object):
             self.observers.remove(turnObserver)
 
     def updateObservers(self, reading):
+        active = []
         for turnObserver in self.observers:
             if not turnObserver.observed and not turnObserver.missed:
                 turnObserver.update(reading)
-            else:
-                self.removeObserver(turnObserver)
+                if not turnObserver.observed and not turnObserver.missed:
+                    active.append(turnObserver)
+            # else: observer completed, drop it from the list
+        self.observers = active
         
     def processStats(self,opsStats):
         opsStats['AverageLoopTime'] = opsStats['totalLoopTime']/opsStats['numLoops']

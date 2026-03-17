@@ -58,7 +58,11 @@ class Rangeservice(object):
         self.rangeReportInterval = 0.5
         self.lastRangeReportTime = 0.
         self.extInterval= 1
-        self.waitTime   = 0.100 # the mb1220 range sensors have a 10Hz read rate
+        # No sleep between reads — readline() blocks until data arrives,
+        # naturally pacing at the Arduino's send rate.  An additional sleep
+        # causes the serial buffer to fill, triggering USB CDC/ACM flow
+        # control which blocks Arduino Serial.print() and disrupts sensor
+        # timing, leading to pulseIn() timeouts and spurious zero readings.
         self.observers  = []
         self.rangemcu.rangePub.addSubscriber(self.genericSubscriber)
         self.rangemcu.rangePub.addSubscriber(self.updateObservers)
@@ -102,9 +106,6 @@ class Rangeservice(object):
                     self.processStats(opsStats)
                     break
 
-            elapsedTime = robtimer() - loopStartTime
-            time.sleep(self.waitTime)
-                
             opsStats['totalLoopTime'] += robtimer() - loopStartTime
             
         self.end()

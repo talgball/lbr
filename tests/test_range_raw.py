@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Direct serial test for range sensors - bypasses lbrsys driver.
-Sends 'g' to start ranging, collects data for 60 seconds, sends 's' to stop.
+Sends 'g' to start ranging, collects data for DURATION seconds, sends 's' to stop.
 Reports any zero readings (excluding Bottom sensor).
 """
 
@@ -11,7 +11,7 @@ import sys
 
 PORT = '/dev/ttyACM0'
 BAUD = 115200
-DURATION = 60
+DURATION = 300
 
 ser = serial.Serial(PORT, BAUD, bytesize=serial.EIGHTBITS,
                     parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,

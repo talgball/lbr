@@ -44,7 +44,7 @@ class Movepa:
         # todo externalize using a method to set tweaks for individual robots
         # This tweak is for lbr6a due to its wheel misalignment.
         # Should probably be part of adjustTask instead of here
-        if a == 0.0 or a == 180:
+        if a == 0.0 or a == 180.0:
             a += 4.0
 
         if p > 1.0:

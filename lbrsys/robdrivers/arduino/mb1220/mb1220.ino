@@ -6,7 +6,7 @@
   lbrsys processes the range information and provides it to the system.
   
 __author__ = "Tal G. Ball"
-__copyright__ = "Copyright (C) 2022 Tal G. Ball"
+__copyright__ = "Copyright (C) 2022, 2026 Tal G. Ball"
 __license__ = "Apache License, Version 2.0"
 __version__ = "1.0"
 
@@ -26,26 +26,37 @@ __version__ = "1.0"
 */
 
 #define NUMBER_OF_SENSORS 5
-#define SENSOR_TRIGGER_PW 25 // mb1220 is 20us min
-// #define SENSOR_TIMEOUT 50000 // mb1220 pw up to 58*765us
-#define SENSOR_TIMEOUT 100000 // mb1220 pw up to 58*765us
-#define SPEED_OF_SOUND 58    // mb1220 returns round trip time (2*29us/cm)
-#define INTER_SENSOR_DELAY 10 // ms between sensor reads for echo dissipation
+#define SENSOR_TRIGGER_PW 25    // mb1220 is 20us min
+#define SENSOR_TIMEOUT 50000    // mb1220 pw up to 58*765us
+#define SPEED_OF_SOUND 58       // mb1220 returns round trip time (2*29us/cm)
+
+// Each sensor requires 99ms/range.  Min pulse width is 25cm * 58us/cm = 1,450us = 1.45ms.
+// Inter sensor delay must be set such that each sensor in rotation is only triggered
+// every 100ms at most, to cover the 99ms range and allow for any further echo dissipation.
+// In a 4 sensor configuration, if each sensor times out, 4 * 50,000us = 200ms would occur between ranges of an
+// individual sensor in the rotation, which is adequate.  However, if each sensor sees a minimum pulse of 
+// 25cm * 58us/cm, and we go on to the next one, the first sensor could see a new reqest in 5.8ms (4*25*58us)
+// We need a delay between sensors of at least 25-5.8 = 19.2ms so that each sensor sees at most one trigger
+// every 100ms.  To give some margin, we'll assume 100ms / enabled sensor count = 25ms
+// 
+#define INTER_SENSOR_DELAY 25
 
 typedef struct Sensor {
   const char *name;
   int ctrlPin;
   int pingPin;
   unsigned long distance;
+  int enabled;
 }Sensor;
 
 Sensor sensors[NUMBER_OF_SENSORS] = {
-  {.name="Forward", .ctrlPin=6,  .pingPin=7, .distance=50},  
-  {.name="Left",    .ctrlPin=12, .pingPin=13, .distance=40},
-  {.name="Right",   .ctrlPin=4,  .pingPin=5, .distance=30},
-  {.name="Back",    .ctrlPin=10, .pingPin=11, .distance=20},
-  {.name="Bottom",  .ctrlPin=0,  .pingPin=0, .distance=10},
+  {.name="Forward", .ctrlPin=6,  .pingPin=7,  .distance=50, .enabled=1},  
+  {.name="Left",    .ctrlPin=12, .pingPin=13, .distance=40, .enabled=1},
+  {.name="Right",   .ctrlPin=4,  .pingPin=5,  .distance=30, .enabled=1},
+  {.name="Back",    .ctrlPin=10, .pingPin=11, .distance=20, .enabled=1},
+  {.name="Bottom",  .ctrlPin=0,  .pingPin=0,  .distance=10, .enabled=0},
 };
+
 
 long deltat = 0;
 int control = 0;
@@ -60,8 +71,8 @@ void setup() {
 
   for(i=0; i<NUMBER_OF_SENSORS; i++) {
     
-    if(sensors[i].ctrlPin == 0){
-      sensors[i].distance = 0;
+    if(sensors[i].ctrlPin == 0 || sensors[i].enabled == 0){
+      //sensors[i].distance = 0;
       continue;
     }
     
@@ -96,12 +107,16 @@ void loop() {
   }
 
   if (control == 1) {
-   
+
+    // Drain pending serial output before the timing-sensitive sensor scan
+    // to minimize USB interrupt activity during pulseIn() measurements.
+    Serial.flush();
+
     tnow = millis();
-    
+
     for (i=0; i<NUMBER_OF_SENSORS; i++) {
       
-      if (sensors[i].ctrlPin == 0) {
+      if (sensors[i].ctrlPin == 0 || sensors[i].enabled == 0) {
         continue;
       }
       
@@ -125,9 +140,12 @@ unsigned long get_distance(Sensor *s) {
   delayMicroseconds(SENSOR_TRIGGER_PW);
   digitalWrite(s->ctrlPin, LOW);
 
-  // Read the ping.  pulseIn returns 0 on timeout — retain the previous
-  // reading rather than reporting 0 (which is below MB1220 minimum range).
-  pulse = pulseIn(s->pingPin, HIGH, SENSOR_TIMEOUT);
+  // Use pulseInLong() instead of pulseIn().  The ATmega32U4 handles USB
+  // via software interrupts on the same chip.  pulseIn() counts tight
+  // assembly loop iterations that are disrupted by USB interrupts,
+  // causing missed pulses.  pulseInLong() uses micros() (hardware timer)
+  // and tolerates interrupts.
+  pulse = pulseInLong(s->pingPin, HIGH, SENSOR_TIMEOUT);
   if (pulse > 0) {
     s->distance = pulse / SPEED_OF_SOUND;
   }

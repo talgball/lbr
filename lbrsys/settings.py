@@ -95,6 +95,7 @@ LAUNCH_NAVCAM = True
 # Set SPEECH_SERVICE = 'native' for a pyttsx3 based implementation or 'aws_polly' for cloud based speech
 SPEECH_SERVICE = 'aws_polly'
 # SPEECH_SERVICE = 'native'
+SPEECH_GREETINGS = True
 
 # URL for the robot registration service for use in configuring peer to peer
 #   communications via WebRTC.  Full URL needed.

@@ -29,7 +29,7 @@ import threading
 import queue
 from datetime import datetime
 
-from lbrsys.settings import SPEECH_SERVICE, AUDIO_DIR, speechLogFile
+from lbrsys.settings import SPEECH_SERVICE, SPEECH_GREETINGS, AUDIO_DIR, speechLogFile
 from lbrsys import speech, set_process_title
 
 if SPEECH_SERVICE == 'aws_polly':
@@ -63,7 +63,8 @@ class SpeechService:
 
 
     def start(self):
-        self.tts.sayStdNow("<Hello")
+        if SPEECH_GREETINGS:
+            self.tts.sayStdNow("<Hello")
 
         while True:
             # don't need the more sophisticated loop since this is essentially
@@ -71,7 +72,8 @@ class SpeechService:
             task = self.commandQ.get()
 
             if task == 'Shutdown':
-                self.tts.sayStdNow("<Goodbye")
+                if SPEECH_GREETINGS:
+                    self.tts.sayStdNow("<Goodbye")
                 break
             else:
                 #to do: add support for std dictionary

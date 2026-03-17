@@ -135,3 +135,5 @@ dmypy.json
 /logs/
 lbrsys/robapps/robfsm/statesd/backup.csv
 docs/architecture_vision.md
+docs/reference
+

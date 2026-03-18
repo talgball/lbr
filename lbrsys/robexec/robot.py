@@ -30,6 +30,8 @@ import subprocess
 import threading
 import time
 import pprint
+import readline
+import atexit
 
 # setting the path here so that robot.py can be 
 #    executed interactively from here Shutdown
@@ -68,6 +70,9 @@ from lbrsys.robexec import robconfig
 
 # Convention for interpreting queue setup configuration data
 QueueNotShared = -1
+
+HISTORY_FILE = os.path.expanduser('~/.lbr_history')
+HISTORY_LENGTH = 1000
 
 
 class Robot(object):
@@ -164,6 +169,39 @@ class Robot(object):
                 #pprint.pprint(c)
         pass # useful breakpoint to examine robot configuration data in debugger
 
+    def _setup_console(self):
+        """Configure readline with history and tab completion."""
+        # Load history from previous sessions
+        try:
+            readline.read_history_file(HISTORY_FILE)
+        except FileNotFoundError:
+            pass
+
+        readline.set_history_length(HISTORY_LENGTH)
+        atexit.register(readline.write_history_file, HISTORY_FILE)
+
+        # Build completion vocabulary
+        slash_commands = ['/' + k + '/' for k in command_map.keys()]
+        shortcut_commands = ['s', 'f', 'b', 'stop', 'Shutdown']
+        ext_commands = list(self.r.extcmds.keys())
+        self._completions = slash_commands + shortcut_commands + ext_commands
+
+        readline.set_completer(self._completer)
+        readline.set_completer_delims('')  # complete the whole line
+        readline.parse_and_bind('tab: complete')
+
+    def _completer(self, text, state):
+        """Readline completer for robot commands."""
+        if state == 0:
+            if text:
+                self._matches = [c for c in self._completions
+                                 if c.startswith(text)]
+            else:
+                self._matches = self._completions[:]
+        if state < len(self._matches):
+            return self._matches[state]
+        return None
+
     def start(self):
         self.r.noteStarted()
 
@@ -184,6 +222,7 @@ class Robot(object):
         if LAUNCH_NAVCAM and 'navcam' in self.r.extcmds:
             self.execExt('navcam')
 
+        self._setup_console()
         self.mainEmbodied()
 
     def mainEmbodied(self):
@@ -392,8 +431,11 @@ class Robot(object):
             
 
     def end(self):
-        #logging.debug('Shutting down..')
         print('Shutting down..')
+        try:
+            readline.write_history_file(HISTORY_FILE)
+        except OSError:
+            pass
         sys.stderr.flush()
         
         for c in self.r.channelList:

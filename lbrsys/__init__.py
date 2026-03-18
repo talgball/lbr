@@ -81,7 +81,7 @@ move_config = namedtuple('move_config', [
                            'm2_direction',
                            'm3_direction',
                            'm4_direction'],
-                           defaults=(17.78, 130, -1, 1, 0, 0)
+                           defaults=(17.78, 520, -1, 1, 0, 0)
                            )
 
 distance    = namedtuple('distance', 'n s e w t')

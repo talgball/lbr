@@ -40,6 +40,7 @@ import io
 import time
 import json
 import math
+import copy
 import logging
 import multiprocessing
 import threading
@@ -207,7 +208,10 @@ ROBOT_TOOLS = [
         "description": "Move the robot with specified power, angle, range, sensor, "
                        "and/or duration. This is the preferred movement command. "
                        "The robot will stop automatically when the range or duration "
-                       "limit is reached. Always specify at least a range or duration.",
+                       "limit is reached. Always specify at least a range or duration. "
+                       "The range parameter is the DISTANCE TO TRAVEL in cm, not "
+                       "a target sensor reading. The sensor parameter specifies "
+                       "which range sensor to use for measuring travel distance.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -221,7 +225,8 @@ ROBOT_TOOLS = [
                 },
                 "range": {
                     "type": "integer",
-                    "description": "Distance limit in cm (0 = no limit)"
+                    "description": "Distance to travel in cm (0 = no limit). "
+                                   "Measured by change in sensor reading from start."
                 },
                 "sensor": {
                     "type": "string",
@@ -261,6 +266,58 @@ ROBOT_TOOLS = [
 
 # Tools that trigger robot movement and require waiting for completion
 MOVEMENT_TOOLS = {'move', 'navigate', 'turn', 'navigate_to_heading'}
+
+
+def compute_movement_summary(pre_state, post_state, cm_per_count):
+    """Compute a human-readable summary of what changed between two state snapshots."""
+    lines = []
+
+    # Range deltas
+    pre_ranges = pre_state.get('Ranges', {})
+    post_ranges = post_state.get('Ranges', {})
+    if pre_ranges and post_ranges:
+        range_parts = []
+        for sensor in ['Forward', 'Back', 'Left', 'Right']:
+            pre_val = pre_ranges.get(sensor)
+            post_val = post_ranges.get(sensor)
+            if pre_val is not None and post_val is not None:
+                delta = post_val - pre_val
+                if delta != 0:
+                    range_parts.append("%s: %d -> %d (%+dcm)" %
+                                       (sensor, pre_val, post_val, delta))
+        if range_parts:
+            lines.append("Range changes: " + ", ".join(range_parts))
+        else:
+            lines.append("Range changes: none detected")
+
+    # Encoder deltas
+    pre_count = pre_state.get('Count', {})
+    post_count = post_state.get('Count', {})
+    if pre_count and post_count:
+        dl = post_count.get('left', 0) - pre_count.get('left', 0)
+        dr = post_count.get('right', 0) - pre_count.get('right', 0)
+        dl_cm = dl * cm_per_count
+        dr_cm = dr * cm_per_count
+        avg_cm = (abs(dl_cm) + abs(dr_cm)) / 2.0
+        lines.append("Encoder counts: left %+d (%+.1fcm), right %+d (%+.1fcm), "
+                      "avg distance %.1fcm" %
+                      (dl, dl_cm, dr, dr_cm, avg_cm))
+
+    # Heading change
+    pre_heading = pre_state.get('MPU', {}).get('heading') if isinstance(
+        pre_state.get('MPU'), dict) else None
+    post_heading = post_state.get('MPU', {}).get('heading') if isinstance(
+        post_state.get('MPU'), dict) else None
+    if pre_heading is not None and post_heading is not None:
+        dh = post_heading - pre_heading
+        if abs(dh) > 1:
+            lines.append("Heading: %.0f -> %.0f (%+.0f deg)" %
+                          (pre_heading, post_heading, dh))
+
+    if not lines:
+        return "No state changes detected."
+
+    return "\n".join(lines)
 
 
 def execute_tool_call(tool_name, arguments, broadcastQ):
@@ -330,6 +387,13 @@ class RobAIService:
         self.model = None
         self.state = {}
         self.last_response_id = None
+
+        wheel_diameter = robot_move_config.wheel_diameter
+        counts_per_rev = robot_move_config.counts_per_rev
+        if counts_per_rev > 0:
+            self.cm_per_count = (math.pi * wheel_diameter) / counts_per_rev
+        else:
+            self.cm_per_count = 0.0
 
         self.setup_client()
         self.start()
@@ -690,6 +754,9 @@ class RobAIService:
             tool_results = []
             has_movement = False
 
+            # Snapshot state before movement for delta computation
+            pre_move_state = copy.deepcopy(self.state)
+
             for fc in function_calls:
                 fn_name = fc.name
                 fn_args = json.loads(fc.arguments)
@@ -719,9 +786,19 @@ class RobAIService:
             # previous_response_id, so we only send the new items.
             follow_up_input = tool_results
 
+            # Compute movement summary comparing before/after state
+            movement_summary = ""
+            if has_movement:
+                movement_summary = compute_movement_summary(
+                    pre_move_state, self.state, self.cm_per_count)
+                logging.info("Movement summary:\n%s" % movement_summary)
+
             # Inject updated telemetry with fresh camera snapshot
-            telemetry_text = ("[Telemetry update after command execution]\n"
-                              + json.dumps(self.state, indent=2, default=str))
+            telemetry_parts = ["[Telemetry update after command execution]"]
+            if movement_summary:
+                telemetry_parts.append("[Movement result]\n" + movement_summary)
+            telemetry_parts.append(json.dumps(self.state, indent=2, default=str))
+            telemetry_text = "\n".join(telemetry_parts)
             snapshot_b64 = self._fetch_snapshot()
             if snapshot_b64:
                 follow_up_input.append({

@@ -71,6 +71,7 @@ class RobMicrophoneService:
         self.broadcastQ = broadcastQ
 
         self.state = IDLE
+        self.muted = False
         self.mic = None
         self.output = None
         self.monitor_thread = None
@@ -183,6 +184,10 @@ class RobMicrophoneService:
             self.handle_start_wake_word()
         elif action == 'stop_wake_word':
             self.handle_stop_wake_word()
+        elif action == 'mute':
+            self.handle_mute()
+        elif action == 'unmute':
+            self.handle_unmute()
         else:
             logging.warning("Unknown mic command action: %s" % action)
             print("Unknown mic command: %s" % action)
@@ -377,6 +382,30 @@ class RobMicrophoneService:
         logging.info("Microphone: wake word stopped, now IDLE")
         print("Microphone: wake word stopped, now IDLE")
 
+    def handle_mute(self):
+        """Mute the microphone — suppresses wake word and VAD triggers."""
+        if self.muted:
+            print("Microphone already muted")
+            return
+
+        self.muted = True
+        status = {'microphone': {'muted': True, 'state': self.state}}
+        self.broadcastQ.put(status)
+        logging.info("Microphone: muted (state remains %s)" % self.state)
+        print("Microphone: muted")
+
+    def handle_unmute(self):
+        """Unmute the microphone — resumes wake word and VAD triggers."""
+        if not self.muted:
+            print("Microphone not muted")
+            return
+
+        self.muted = False
+        status = {'microphone': {'muted': False, 'state': self.state}}
+        self.broadcastQ.put(status)
+        logging.info("Microphone: unmuted (state %s)" % self.state)
+        print("Microphone: unmuted")
+
     def _wake_word_monitor(self):
         """Background thread: feed audio to openWakeWord, watch for wake word.
 
@@ -414,12 +443,15 @@ class RobMicrophoneService:
                 continue
 
             if self.state == WAKE_LISTENING:
-                # Update running ambient noise estimate
+                # Update running ambient noise estimate even when muted
                 rms = self._calculate_rms(recent)
                 if ambient_rms == 0.0:
                     ambient_rms = float(rms)
                 else:
                     ambient_rms = 0.95 * ambient_rms + 0.05 * rms
+
+                if self.muted:
+                    continue
 
                 # Convert raw PCM bytes to int16 numpy array for openWakeWord
                 audio_chunk = np.frombuffer(
@@ -526,11 +558,14 @@ class RobMicrophoneService:
             rms = self._calculate_rms(recent)
 
             if self.state == LISTENING:
-                # Update running ambient noise estimate
+                # Update running ambient noise estimate even when muted
                 if ambient_rms == 0.0:
                     ambient_rms = float(rms)
                 else:
                     ambient_rms = 0.95 * ambient_rms + 0.05 * rms
+
+                if self.muted:
+                    continue
 
                 if rms > max(MIC_SILENCE_THRESHOLD, ambient_rms * 2.0):
                     logging.info("Voice activity detected (RMS=%d, ambient=%d)"
@@ -725,7 +760,7 @@ if __name__ == '__main__':
 
     print("\nMicrophone Service test harness.")
     print("Commands: start_listening, stop_listening, start_capture, "
-          "stop_capture, start_wake_word, stop_wake_word, quit")
+          "stop_capture, start_wake_word, stop_wake_word, mute, unmute, quit")
     while True:
         try:
             cmd = input("Mic> ")
@@ -734,7 +769,8 @@ if __name__ == '__main__':
                 break
             if cmd in ('start_listening', 'stop_listening',
                        'start_capture', 'stop_capture',
-                       'start_wake_word', 'stop_wake_word'):
+                       'start_wake_word', 'stop_wake_word',
+                       'mute', 'unmute'):
                 cq.put(mic_command(cmd))
             elif cmd:
                 print("Unknown command: %s" % cmd)

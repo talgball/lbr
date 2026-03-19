@@ -95,6 +95,20 @@ RESPONSE MODALITY:
 If camera images are attached, they show the current view from the robot's
 active camera. Use them to understand the robot's surroundings when relevant.
 
+MULTI-STEP EXECUTION:
+- When executing a multi-step plan (e.g., segmented approach), keep acting
+  until the mission is complete. After each movement, you will receive
+  updated telemetry and a fresh camera image. Use these to decide your
+  next action and ISSUE IT — do not just describe what you plan to do next.
+- IMPORTANT: Each response round-trip costs time and counts toward an
+  iteration limit. Never call report() alone — always pair it with the
+  next action tool call (navigate, turn, etc.) in the SAME response.
+  You can call multiple tools at once: e.g., report() + navigate() together.
+  If you want to report status, do it alongside the next movement command.
+- Only stop (respond with no action tool call) when: the mission is
+  complete, an unsafe condition is detected, or you need clarification from
+  the operator.
+
 SAFETY CONSTRAINTS:
 - Always use bounded movements. Every navigate() call MUST include a range
   and/or duration limit. Never issue open-ended movement commands.
@@ -717,10 +731,33 @@ class RobAIService:
             self._process_response(response)
 
         except Exception as e:
-            error_msg = "AI request error: %s" % str(e)
+            error_str = str(e)
+            if ("No tool output found" in error_str
+                    and self.last_response_id is not None):
+                # Previous conversation left dangling tool calls.
+                # Retry without conversation history.
+                logging.warning(
+                    "Dangling tool calls in conversation history, "
+                    "starting fresh: %s" % error_str)
+                self.last_response_id = None
+                try:
+                    response = self.client.responses.create(
+                        model=self.model,
+                        instructions=instructions,
+                        input=input_items,
+                        tools=ROBOT_TOOLS,
+                        store=True,
+                    )
+                    self.last_response_id = response.id
+                    self._process_response(response)
+                    return
+                except Exception as retry_e:
+                    error_str = str(retry_e)
+
+            error_msg = "AI request error: %s" % error_str
             logging.error(error_msg)
             print(error_msg)
-            self.broadcastQ.put(exec_report('ai_error', str(e)))
+            self.broadcastQ.put(exec_report('ai_error', error_str))
 
     def _process_response(self, response):
         """Process a Responses API response, running the sense-act loop
@@ -735,6 +772,10 @@ class RobAIService:
         further tool calls or the iteration limit is reached.
         """
         iteration = 0
+        # Cap non-movement (report-only) iterations to avoid infinite
+        # report loops while still allowing the model a few planning turns
+        MAX_NON_MOVEMENT_ITERATIONS = 3
+        non_movement_iterations = 0
 
         while iteration < MAX_SENSE_ACT_ITERATIONS:
             iteration += 1
@@ -781,15 +822,26 @@ class RobAIService:
                     has_movement = True
 
             # If movement was commanded, wait for it to complete
+            stop_after_send = False
             if has_movement:
+                non_movement_iterations = 0  # Reset on actual movement
                 logging.info("Waiting for movement to complete...")
                 completed = self._wait_for_movement_complete()
                 if not completed:
                     logging.warning("Movement timed out, continuing anyway")
+            else:
+                non_movement_iterations += 1
+                if non_movement_iterations >= MAX_NON_MOVEMENT_ITERATIONS:
+                    logging.warning(
+                        "Reached %d consecutive non-movement iterations, "
+                        "stopping sense-act loop" % non_movement_iterations)
+                    stop_after_send = True
 
             # Build follow-up input: tool results + telemetry update.
             # The model's output items are already known server-side via
             # previous_response_id, so we only send the new items.
+            # Tool results MUST always be sent back to avoid leaving
+            # dangling tool calls in the conversation history.
             follow_up_input = tool_results
 
             # Compute movement summary comparing before/after state
@@ -803,6 +855,10 @@ class RobAIService:
             telemetry_parts = ["[Telemetry update after command execution]"]
             if movement_summary:
                 telemetry_parts.append("[Movement result]\n" + movement_summary)
+            else:
+                telemetry_parts.append(
+                    "[No movement occurred — issue a movement tool call "
+                    "to continue the mission]")
             telemetry_parts.append(json.dumps(self.state, indent=2, default=str))
             telemetry_text = "\n".join(telemetry_parts)
             snapshot_b64 = self._fetch_snapshot()
@@ -846,12 +902,52 @@ class RobAIService:
                 print(error_msg)
                 self.broadcastQ.put(exec_report('ai_error', str(e)))
                 break
+
+            if stop_after_send:
+                break
+
         else:
             msg = ("AI sense-act loop reached max iterations (%d)" %
                    MAX_SENSE_ACT_ITERATIONS)
             logging.warning(msg)
             print(msg)
             self.broadcastQ.put(exec_report('ai', msg))
+
+        # Ensure the conversation doesn't end with dangling tool calls.
+        # If the final response has function calls we didn't process
+        # (e.g., max iterations reached), send back cancellation results
+        # so the next request can chain onto a clean conversation state.
+        final_calls = [item for item in response.output
+                       if item.type == "function_call"]
+        if final_calls:
+            logging.info("Cleaning up %d dangling tool call(s) from "
+                         "final response" % len(final_calls))
+            cleanup_input = [{
+                "type": "function_call_output",
+                "call_id": fc.call_id,
+                "output": "Task ended — iteration limit reached.",
+            } for fc in final_calls]
+            try:
+                cleanup_resp = self.client.responses.create(
+                    model=self.model,
+                    instructions=instructions,
+                    input=cleanup_input,
+                    tools=ROBOT_TOOLS,
+                    previous_response_id=self.last_response_id,
+                    store=True,
+                )
+                self.last_response_id = cleanup_resp.id
+                # Report any final text the model produces
+                for item in cleanup_resp.output:
+                    if item.type == "message":
+                        for content in item.content:
+                            if content.type == "output_text" and content.text:
+                                self.broadcastQ.put(
+                                    exec_report('ai', content.text))
+            except Exception as e:
+                logging.warning("Failed to clean up dangling tool calls: "
+                                "%s" % str(e))
+                self.last_response_id = None
 
     def update_state_from_feedback(self, task):
         """Accumulate telemetry from feedback messages into state snapshot.

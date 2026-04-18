@@ -83,14 +83,21 @@ available tools to issue robot commands.  You can call multiple tools in
 sequence if needed.
 
 RESPONSE MODALITY:
-- Match the modality of your response to the modality of the request.
-- Voice commands (from the microphone/wake word system) should get spoken
+- Match the modality of your response to the modality of the ORIGINAL
+  request that started the current mission — not the latest follow-up
+  turn. Telemetry updates are system-injected context, not a new request,
+  and do NOT change the response modality.
+- Voice commands (marked "[Voice command from ...]") should get spoken
   responses using the speak tool. The operator is listening, not reading.
+  This applies to EVERY turn of a multi-step voice-initiated mission,
+  including final answers, intermediate status, and scene descriptions.
 - Console/text commands should get text responses using the report tool.
-- Detailed technical data (sensor readings, diagnostics) should always go
-  to report, regardless of input modality — it's too dense to speak.
-- When a voice command triggers an action with results (e.g., "tell me what
-  you see"), speak the substantive answer, not just an acknowledgment.
+- Only raw numeric data (sensor readings, encoder counts, diagnostics)
+  should go to report regardless of input modality — it's too dense to
+  speak. Observational answers ("I see a table", "the room is bright")
+  are NOT raw data; they should be spoken when the request was voice.
+- When a voice command triggers an action with results (e.g., "tell me
+  what you see"), speak the substantive answer, not just an acknowledgment.
 
 If camera images are attached, they show the current view from the robot's
 active camera. Use them to understand the robot's surroundings when relevant.
@@ -407,6 +414,13 @@ class RobAIService:
         self.model = None
         self.state = {}
         self.last_response_id = None
+        # Interrupt coordination: allows a new ai_request arriving mid-mission
+        # to preempt the active sense-act loop.
+        self.interrupt_event = threading.Event()
+        self.active_request_thread = None
+        self.active_response_id = None  # response_id of in-flight mission
+        self.active_function_calls = []  # unresolved tool calls of in-flight mission
+        self.active_lock = threading.Lock()
 
         wheel_diameter = robot_move_config.wheel_diameter
         counts_per_rev = robot_move_config.counts_per_rev
@@ -507,14 +521,45 @@ class RobAIService:
         logging.info("AI request: %s" % request.prompt)
         print("AI processing: %s" % request.prompt)
 
+        # If a mission is already running, interrupt it before starting
+        # the new request.
+        was_interrupted = self._interrupt_active_mission()
+
         # Run the API call in a thread to avoid blocking telemetry processing
         t = threading.Thread(
             target=self._call_openai,
-            args=(request,),
+            args=(request, was_interrupted),
             name="AI-Request-Thread"
         )
         t.daemon = True
+        with self.active_lock:
+            self.active_request_thread = t
+            self.interrupt_event.clear()
         t.start()
+
+    def _interrupt_active_mission(self):
+        """If a sense-act loop is currently running, signal it to stop,
+        issue an immediate motor stop, and wait briefly for the worker
+        thread to exit.
+
+        Returns True if an active mission was interrupted, False otherwise.
+        """
+        with self.active_lock:
+            active = self.active_request_thread
+            if active is None or not active.is_alive():
+                return False
+            self.interrupt_event.set()
+
+        logging.warning("Interrupting active AI mission for new request")
+        print("AI: interrupting active mission")
+        # Immediate safety stop — don't wait for the loop to get here
+        self.broadcastQ.put("/r/0/0")
+
+        active.join(timeout=3.0)
+        if active.is_alive():
+            logging.warning("Active mission thread did not exit within 3s; "
+                            "proceeding with new request anyway")
+        return True
 
     def handle_audio(self, audio_msg):
         """Handle incoming mic_audio messages.
@@ -674,13 +719,18 @@ class RobAIService:
            hasn't reached the motors yet.
         2. Wait for movement to STOP (zero current on both channels).
 
-        Returns True if movement completed, False on timeout.
+        Returns True if movement completed, False on timeout or interrupt.
+        Checks interrupt_event during polling so a new ai_request can
+        preempt a long wait.
         """
         start_time = time.time()
         startup_timeout = 5.0  # Max time to wait for motors to engage
 
         # Phase 1: Wait for movement to start (non-zero current)
         while time.time() - start_time < startup_timeout:
+            if self.interrupt_event.is_set():
+                logging.info("Movement wait interrupted during startup phase")
+                return False
             time.sleep(MOVEMENT_POLL_INTERVAL)
             status = self._is_movement_complete()
             if status is False:  # Motors drawing current
@@ -694,6 +744,9 @@ class RobAIService:
 
         # Phase 2: Wait for movement to stop (zero current)
         while time.time() - start_time < MOVEMENT_COMPLETE_TIMEOUT:
+            if self.interrupt_event.is_set():
+                logging.info("Movement wait interrupted during run phase")
+                return False
             time.sleep(MOVEMENT_POLL_INTERVAL)
             status = self._is_movement_complete()
             if status is True:  # Both channels at zero
@@ -705,15 +758,30 @@ class RobAIService:
                         MOVEMENT_COMPLETE_TIMEOUT)
         return False
 
-    def _call_openai(self, request):
+    def _call_openai(self, request, was_interrupted=False):
         """Worker thread: call OpenAI Responses API and process the response.
 
         Implements a sense-act loop for multi-step tasks: after executing
         tool calls that involve movement, waits for movement to complete,
         then feeds updated telemetry back to the model for the next decision.
+
+        If was_interrupted is True, resolves any dangling tool calls from
+        the prior mission before sending this request, so the conversation
+        history reflects that the prior action was aborted.
         """
         instructions = self._build_instructions()
-        user_input = self._build_user_input(request.prompt)
+
+        # Resolve dangling tool calls from an interrupted mission.
+        if was_interrupted:
+            self._resolve_interrupted_tool_calls(instructions)
+
+        user_prompt = request.prompt
+        if was_interrupted:
+            user_prompt = "[Operator interrupt] " + user_prompt
+        # Classify the originating modality so the sense-act loop can
+        # remind the model to stay consistent across iterations.
+        is_voice = user_prompt.startswith("[Voice command")
+        user_input = self._build_user_input(user_prompt)
 
         input_items = [{"role": "user", "content": user_input}]
 
@@ -728,7 +796,7 @@ class RobAIService:
             )
 
             self.last_response_id = response.id
-            self._process_response(response)
+            self._process_response(response, is_voice=is_voice)
 
         except Exception as e:
             error_str = str(e)
@@ -749,7 +817,7 @@ class RobAIService:
                         store=True,
                     )
                     self.last_response_id = response.id
-                    self._process_response(response)
+                    self._process_response(response, is_voice=is_voice)
                     return
                 except Exception as retry_e:
                     error_str = str(retry_e)
@@ -759,7 +827,44 @@ class RobAIService:
             print(error_msg)
             self.broadcastQ.put(exec_report('ai_error', error_str))
 
-    def _process_response(self, response):
+    def _resolve_interrupted_tool_calls(self, instructions):
+        """Send cancellation results for any tool calls left pending by an
+        interrupted mission, so the conversation history is clean before
+        the next request chains onto it.
+        """
+        with self.active_lock:
+            pending_calls = list(self.active_function_calls)
+            pending_response_id = self.active_response_id
+            self.active_function_calls = []
+            self.active_response_id = None
+
+        if not pending_calls or pending_response_id is None:
+            return
+
+        cleanup_input = [{
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": "Task interrupted by operator.",
+        } for call_id in pending_calls]
+
+        try:
+            cleanup_resp = self.client.responses.create(
+                model=self.model,
+                instructions=instructions,
+                input=cleanup_input,
+                tools=ROBOT_TOOLS,
+                previous_response_id=pending_response_id,
+                store=True,
+            )
+            self.last_response_id = cleanup_resp.id
+            logging.info("Resolved %d tool call(s) from interrupted mission"
+                         % len(pending_calls))
+        except Exception as e:
+            logging.warning("Failed to resolve interrupted tool calls, "
+                            "starting fresh conversation: %s" % str(e))
+            self.last_response_id = None
+
+    def _process_response(self, response, is_voice=False):
         """Process a Responses API response, running the sense-act loop
         if tool calls are present.
 
@@ -770,6 +875,10 @@ class RobAIService:
         injects updated telemetry, and sends a follow-up request to the model.
         Repeats until the model produces a final text response with no
         further tool calls or the iteration limit is reached.
+
+        is_voice indicates whether the originating request was a voice
+        command, so telemetry follow-ups can remind the model to keep
+        responses in the spoken modality.
         """
         iteration = 0
         # Cap non-movement (report-only) iterations to avoid infinite
@@ -780,11 +889,23 @@ class RobAIService:
         while iteration < MAX_SENSE_ACT_ITERATIONS:
             iteration += 1
 
+            if self.interrupt_event.is_set():
+                logging.info("Sense-act loop interrupted at iter %d start"
+                             % iteration)
+                break
+
             # Separate tool calls from text output
             function_calls = [item for item in response.output
                               if item.type == "function_call"]
             text_items = [item for item in response.output
                           if item.type == "message"]
+
+            # Track unresolved tool calls so an interrupt handler can
+            # resolve them when starting a replacement mission.
+            with self.active_lock:
+                self.active_response_id = response.id
+                self.active_function_calls = [fc.call_id
+                                              for fc in function_calls]
 
             # Report any text content to the operator
             for item in text_items:
@@ -837,6 +958,15 @@ class RobAIService:
                         "stopping sense-act loop" % non_movement_iterations)
                     stop_after_send = True
 
+            # Check for interrupt before sending tool results.
+            # Leave tool_results unresolved so the interrupt handler can
+            # resolve them with "Task interrupted by operator." when
+            # starting the replacement mission.
+            if self.interrupt_event.is_set():
+                logging.info("Sense-act loop interrupted before sending "
+                             "tool results back to API")
+                return
+
             # Build follow-up input: tool results + telemetry update.
             # The model's output items are already known server-side via
             # previous_response_id, so we only send the new items.
@@ -853,6 +983,11 @@ class RobAIService:
 
             # Inject updated telemetry with fresh camera snapshot
             telemetry_parts = ["[Telemetry update after command execution]"]
+            if is_voice:
+                telemetry_parts.append(
+                    "[Modality reminder: originating request was voice — "
+                    "any response to the operator must use the speak tool, "
+                    "including scene descriptions and final answers]")
             if movement_summary:
                 telemetry_parts.append("[Movement result]\n" + movement_summary)
             else:
@@ -948,6 +1083,12 @@ class RobAIService:
                 logging.warning("Failed to clean up dangling tool calls: "
                                 "%s" % str(e))
                 self.last_response_id = None
+
+        # Mission completed normally — clear active tracking so a later
+        # ai_request isn't treated as an interrupt.
+        with self.active_lock:
+            self.active_function_calls = []
+            self.active_response_id = None
 
     def update_state_from_feedback(self, task):
         """Accumulate telemetry from feedback messages into state snapshot.

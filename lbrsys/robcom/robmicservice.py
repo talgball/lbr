@@ -42,8 +42,15 @@ sys.path.insert(1, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(2, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.insert(3, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from lbrsys import mic_command, mic_audio, feedback, set_process_title
+from lbrsys import (mic_command, mic_audio, feedback, wake_event,
+                    speech_control, set_process_title)
 from lbrsys.settings import micLogFile
+
+
+# Grace period (seconds) after TTS speaking_end before we resume wake-word
+# scoring. Absorbs Bluetooth/ALSA drain so the robot doesn't wake on its
+# own final syllable.
+_TTS_MUTE_GRACE = 0.3
 
 proc = multiprocessing.current_process()
 
@@ -72,6 +79,12 @@ class RobMicrophoneService:
 
         self.state = IDLE
         self.muted = False
+        # Separate from user-driven mute: set while the speech service is
+        # actively producing a TTS utterance. Gating both the VAD and
+        # wake-word paths prevents the robot from hearing itself.
+        self._tts_muted = False
+        self._tts_unmute_timer = None
+        self._tts_mute_lock = threading.Lock()
         self.mic = None
         self.output = None
         self.monitor_thread = None
@@ -99,13 +112,39 @@ class RobMicrophoneService:
             print("Warning: Audio driver import failed: %s" % str(e))
             return
 
-        # Determine device
+        # Determine device. AEC path overrides device selection: capture
+        # through the PulseAudio virtual source created by bin/setup_aec,
+        # which gives us the mic minus the reference signal.
+        use_aec = False
+        try:
+            from lbrsys.settings import (MIC_USE_AEC, MIC_AEC_SOURCE)
+            use_aec = MIC_USE_AEC
+        except ImportError:
+            pass
+
         device = MIC_DEVICE
-        if device is None:
-            device = ALSAMicrophone.find_device('C920')
-        if device is None:
-            device = 'default'
-            logging.warning("No C920 found, using default ALSA device")
+        if use_aec:
+            if self._pulse_source_exists(MIC_AEC_SOURCE):
+                # alsaaudio's 'pulse' ALSA plugin reads PULSE_SOURCE at
+                # open time to choose the source.
+                os.environ['PULSE_SOURCE'] = MIC_AEC_SOURCE
+                device = 'pulse'
+                logging.info("Mic: using AEC source '%s' via pulse" %
+                             MIC_AEC_SOURCE)
+                print("Mic: using AEC source '%s'" % MIC_AEC_SOURCE)
+            else:
+                logging.warning("AEC source '%s' not present — run "
+                                "bin/setup_aec. Falling back to direct mic."
+                                % MIC_AEC_SOURCE)
+                print("Mic: AEC source missing, falling back to direct mic")
+                use_aec = False
+
+        if not use_aec:
+            if device is None:
+                device = ALSAMicrophone.find_device('C920')
+            if device is None:
+                device = 'default'
+                logging.warning("No C920 found, using default ALSA device")
 
         self.output = AudioStreamingOutput(
             ring_buffer_seconds=MIC_RING_BUFFER_SECONDS,
@@ -122,6 +161,23 @@ class RobMicrophoneService:
             name='mic',
         )
         self.mic.config_device()
+
+    @staticmethod
+    def _pulse_source_exists(source_name):
+        """Check whether a PulseAudio source with the given name is loaded.
+        Used to validate that module-echo-cancel has been set up before we
+        try to use its virtual source."""
+        import subprocess
+        try:
+            out = subprocess.check_output(['pactl', 'list', 'short', 'sources'],
+                                          text=True, timeout=2)
+        except Exception:
+            return False
+        for line in out.splitlines():
+            parts = line.split('\t')
+            if len(parts) >= 2 and parts[1] == source_name:
+                return True
+        return False
 
         logging.info("Microphone service audio setup complete")
         print("Microphone service audio setup complete")
@@ -161,11 +217,47 @@ class RobMicrophoneService:
         """Route incoming messages by type."""
         if type(task) is mic_command:
             self.handle_command(task)
+        elif type(task) is speech_control:
+            self.handle_speech_control(task)
         elif type(task) is str:
             logging.debug("Microphone service received string: %s" % task)
         else:
             logging.debug("Microphone service received unknown type: %s %s" %
                           (type(task).__name__, str(task)))
+
+    def handle_speech_control(self, ctrl):
+        """React to TTS start/end signals to prevent the mic from hearing
+        the robot's own voice. 'stop' is for the speech service itself and
+        is not meaningful here."""
+        if ctrl.action == 'speaking_start':
+            self._begin_tts_mute()
+        elif ctrl.action == 'speaking_end':
+            self._schedule_tts_unmute()
+
+    def _begin_tts_mute(self):
+        with self._tts_mute_lock:
+            if self._tts_unmute_timer is not None:
+                self._tts_unmute_timer.cancel()
+                self._tts_unmute_timer = None
+            if not self._tts_muted:
+                self._tts_muted = True
+                logging.info("Microphone: TTS mute engaged")
+
+    def _schedule_tts_unmute(self):
+        with self._tts_mute_lock:
+            if self._tts_unmute_timer is not None:
+                self._tts_unmute_timer.cancel()
+            self._tts_unmute_timer = threading.Timer(
+                _TTS_MUTE_GRACE, self._complete_tts_unmute)
+            self._tts_unmute_timer.daemon = True
+            self._tts_unmute_timer.start()
+
+    def _complete_tts_unmute(self):
+        with self._tts_mute_lock:
+            self._tts_unmute_timer = None
+            if self._tts_muted:
+                self._tts_muted = False
+                logging.info("Microphone: TTS mute released")
 
     def handle_command(self, cmd):
         """Dispatch mic_command by action."""
@@ -453,6 +545,12 @@ class RobMicrophoneService:
                 if self.muted:
                     continue
 
+                # Note: during TTS (self._tts_muted) we intentionally KEEP
+                # scoring the wake word so the operator can interrupt a
+                # talking robot. The coarse VAD path stays gated because
+                # it would fire on our own voice; the wake model is
+                # selective enough to tolerate the background audio.
+
                 # Convert raw PCM bytes to int16 numpy array for openWakeWord
                 audio_chunk = np.frombuffer(
                     recent[:oww_chunk_bytes], dtype=np.int16
@@ -461,6 +559,14 @@ class RobMicrophoneService:
                 # Get predictions from openWakeWord
                 predictions = self.oww_model.predict(audio_chunk)
                 score = predictions.get(self.wake_word_name, 0.0)
+
+                # Log non-trivial scores while the robot is talking so we
+                # can tell whether AEC is leaving enough signal for the
+                # wake-word model. Uses INFO so it shows up in the mic
+                # log without enabling the full DEBUG flag.
+                if self._tts_muted and score > 0.005:
+                    logging.info("WakeWord [TTS active, rms=%d]: %s=%.3f" %
+                                 (rms, self.wake_word_name, score))
 
                 if MIC_WAKE_WORD_DEBUG:
                     if score > 0.01:
@@ -474,6 +580,19 @@ class RobMicrophoneService:
                     print("Wake word '%s' detected! (score=%.3f)" %
                           (self.wake_word_name, score))
                     self.oww_model.reset()
+
+                    # Fast-path signal: publish the wake event BEFORE we
+                    # start capturing the command or synthesize the tone,
+                    # so the AI service can stop motors and abort speech
+                    # without waiting on Whisper transcription.
+                    try:
+                        self.broadcastQ.put(wake_event(
+                            word=self.wake_word_name,
+                            confidence=float(score),
+                            timestamp=time.time(),
+                        ))
+                    except Exception as e:
+                        logging.debug("wake_event publish failed: %s" % e)
 
                     # Play feedback tone on daemon thread
                     if (self._wake_feedback_enabled
@@ -564,7 +683,7 @@ class RobMicrophoneService:
                 else:
                     ambient_rms = 0.95 * ambient_rms + 0.05 * rms
 
-                if self.muted:
+                if self.muted or self._tts_muted:
                     continue
 
                 if rms > max(MIC_SILENCE_THRESHOLD, ambient_rms * 2.0):

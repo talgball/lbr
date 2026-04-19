@@ -26,14 +26,30 @@ import boto3
 import os
 import time
 import io
+import subprocess
+import tempfile
+import threading
 
 from pydub import AudioSegment
-from pydub.playback import play
 
 from robcom.robmsgdict import messageDict
 from robcom import publisher
 
 from lbrsys.settings import AUDIO_DIR
+
+
+def _aec_sink():
+    """Return the configured PulseAudio AEC sink name, or None if AEC is
+    disabled. Used to select paplay's --device explicitly rather than
+    relying on PULSE_SINK, which SDL-based players (ffplay) only honor
+    when SDL happens to pick the pulse audio backend."""
+    try:
+        from lbrsys.settings import MIC_USE_AEC, MIC_AEC_SINK
+    except ImportError:
+        return None
+    if not MIC_USE_AEC:
+        return None
+    return MIC_AEC_SINK
 
 
 class Robtts:
@@ -48,6 +64,9 @@ class Robtts:
         self.language = language
         # self.engine.setProperty('rate', rate) # rate not currently used for this version
         self.speechPub = publisher.Publisher("Speech Publisher")
+        # Playback subprocess handle for interruptible speech
+        self._play_proc = None
+        self._play_lock = threading.Lock()
 
 
     # small abstraction in case we need a db / more sophisticated approach
@@ -72,12 +91,8 @@ class Robtts:
                                                      OutputFormat=self.output_format,
                                                      VoiceId=self.voice_id)
 
-        with io.BytesIO() as f: # use a memory stream
-            f.write(pollyResponse['AudioStream'].read())
-            f.seek(0)
-            sound = AudioSegment.from_file(f, format=self.output_format)
-            play(sound)
-
+        audio_bytes = pollyResponse['AudioStream'].read()
+        self._play_audio_bytes(audio_bytes, self.output_format)
         self.speechPub.publish(str(text))
         return
 
@@ -92,14 +107,57 @@ class Robtts:
                         fmt = fname[-1]
                         if fname[0] == msgKey[1:].lower():
                             sf_path = os.path.join(AUDIO_DIR, sf)
-                            # print(f"Matched saved audio file: {sf_path}")
-                            sound = AudioSegment.from_file(sf_path, format=fmt)
-                            play(sound)
+                            self._play_file(sf_path)
                             return
 
         # by default, say as normal
         self.say(msgKey)
         return
+
+    def _play_audio_bytes(self, audio_bytes, fmt):
+        """Decode the synth output to WAV and play it. paplay (used when
+        AEC is enabled) only accepts WAV/raw, so we always normalize to
+        WAV. Blocks until playback completes or is interrupted via stop()."""
+        seg = AudioSegment.from_file(io.BytesIO(audio_bytes), format=fmt)
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+            tmp_path = f.name
+        try:
+            seg.export(tmp_path, format='wav')
+            self._play_file(tmp_path)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+    def _play_file(self, path):
+        """Play an audio file, retaining the Popen handle so stop() can
+        terminate playback mid-utterance. When AEC is enabled, we route
+        via paplay --device=<sink> so the speaker stream is guaranteed to
+        go through the echo-cancel module as the reference signal.
+        paplay plays WAV natively; MP3 has already been decoded upstream."""
+        sink = _aec_sink()
+        if sink and path.lower().endswith('.wav'):
+            cmd = ['paplay', '--device=' + sink, path]
+        else:
+            cmd = ['ffplay', '-nodisp', '-autoexit', '-hide_banner',
+                   '-loglevel', 'error', path]
+        with self._play_lock:
+            self._play_proc = subprocess.Popen(
+                cmd, stdin=subprocess.DEVNULL,
+            )
+            proc = self._play_proc
+        proc.wait()
+        with self._play_lock:
+            if self._play_proc is proc:
+                self._play_proc = None
+
+    def stop(self):
+        """Abort any in-flight speech playback immediately."""
+        with self._play_lock:
+            proc = self._play_proc
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
 
 
     def sayStd(self, msgKey, language='English'):

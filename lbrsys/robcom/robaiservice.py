@@ -50,6 +50,7 @@ import urllib.request
 import ssl
 
 from lbrsys import (ai_request, feedback, exec_report, mic_audio,
+                     wake_event, speech_control,
                      set_process_title, robot_move_config, robot_ai_notes)
 from lbrsys.settings import aiLogFile
 
@@ -487,6 +488,8 @@ class RobAIService:
             self.update_state_from_feedback(task)
         elif type(task) is mic_audio:
             self.handle_audio(task)
+        elif type(task) is wake_event:
+            self.handle_wake_event(task)
         elif type(task) is exec_report:
             self.update_state_from_report(task)
         elif type(task) is dict:
@@ -496,6 +499,31 @@ class RobAIService:
         else:
             logging.debug("AI service received unknown type: %s %s" %
                           (type(task).__name__, str(task)))
+
+    def handle_wake_event(self, evt):
+        """Fast-path response to wake-word detection. Halts motion and
+        aborts any in-flight speech immediately, without waiting on
+        Whisper. Tool-call cleanup is deferred to the transcribed
+        ai_request that follows, which runs _interrupt_active_mission
+        the usual way.
+        """
+        logging.info("Wake event: word=%s confidence=%.3f" %
+                     (evt.word, evt.confidence))
+        print("AI: wake event — fast stop")
+
+        # Stop motors first. Harmless if already stopped.
+        self.broadcastQ.put("/r/0/0")
+        # Cut any currently-playing utterance.
+        self.broadcastQ.put(speech_control('stop'))
+
+        # Signal the sense-act loop (if one is running) to bail. We do
+        # NOT join the thread or resolve tool calls here — the follow-up
+        # ai_request from transcription handles that through
+        # _interrupt_active_mission.
+        with self.active_lock:
+            if (self.active_request_thread is not None
+                    and self.active_request_thread.is_alive()):
+                self.interrupt_event.set()
 
     def handle_request(self, request):
         """Send prompt to OpenAI with robot state context and tool definitions.

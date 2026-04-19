@@ -99,6 +99,13 @@ select_camera = namedtuple('select_camera', 'name')
 ai_request = namedtuple('ai_request', 'prompt context', defaults=(None,))
 mic_command = namedtuple('mic_command', 'action params', defaults=(None,))
 mic_audio = namedtuple('mic_audio', 'audio_data format duration source')
+# Fast-path signal: mic detected the wake word. Emitted BEFORE transcription
+# so the AI service can issue a safety stop without waiting for Whisper.
+wake_event = namedtuple('wake_event', 'word confidence timestamp')
+# Speech coordination signals. Actions: 'stop' (abort current utterance),
+# 'speaking_start' (mic should self-mute), 'speaking_end' (mic may unmute
+# after grace period).
+speech_control = namedtuple('speech_control', 'action')
 
 # map between namedtuple (i.e. message types) and channel types
 # This map is used in message routings
@@ -111,13 +118,13 @@ channelMap = {
         motorCommandResult,
         calibrateMagnetometer,
     },
-    'Speech': {speech},
+    'Speech': {speech, speech_control},
     'Application': {feedback, exec_report, dict},
     'Dance': {dance},
     'IoT': {iot},
     'Camera': {select_camera},
-    'AI': {ai_request, feedback, exec_report, mic_audio},
-    'Microphone': {mic_command},
+    'AI': {ai_request, feedback, exec_report, mic_audio, wake_event},
+    'Microphone': {mic_command, speech_control},
 }
 
 # command_map generalizes and streamlines console command processing

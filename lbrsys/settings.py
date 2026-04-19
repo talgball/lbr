@@ -68,6 +68,16 @@ MIC_SERVICE = True
 MIC_DEVICE = None                      # None = auto-detect C920; or 'hw:1,0'
 MIC_SAMPLE_RATE = 16000
 MIC_CHANNELS = 1
+
+# Acoustic echo cancellation (PulseAudio module-echo-cancel / WebRTC AEC3).
+# When enabled, the mic captures from a PulseAudio "virtual" source whose
+# input is the raw mic minus the reference signal sent to the speaker.
+# Run bin/setup_aec once per login session to create the virtual devices,
+# then restart lbrsys. If the virtual devices don't exist, the services
+# log a warning and fall back to direct ALSA / default sink.
+MIC_USE_AEC = True
+MIC_AEC_SOURCE = 'mic_aec'             # PulseAudio source name for AEC'd mic
+MIC_AEC_SINK = 'spk_aec'               # PulseAudio sink name for AEC playback
 MIC_RING_BUFFER_SECONDS = 3.0
 MIC_SILENCE_THRESHOLD = 500            # RMS energy for voice activity detection
 MIC_SILENCE_DURATION = 2.0             # Seconds of silence to end capture

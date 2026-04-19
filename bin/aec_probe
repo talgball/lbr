@@ -1,0 +1,37 @@
+#!/bin/bash
+# Record 10 seconds from mic_aec (the AEC'd mic) while the robot is
+# talking. Play back the recording to hear, with your own ears, what
+# the wake-word model is being fed: the operator's voice with the
+# robot's TTS cancelled out, or some mush in between.
+#
+# Usage:
+#   In one terminal: run lbrsys, trigger a long utterance (e.g. a report).
+#   In another:      bin/aec_probe [seconds]
+#   Then:            paplay /tmp/aec_probe.wav   # listen to what AEC kept
+
+set -euo pipefail
+
+DURATION="${1:-10}"
+OUT=/tmp/aec_probe.wav
+SRC="mic_aec"
+
+if ! pactl list short sources | awk '{print $2}' | grep -qx "$SRC"; then
+    echo "ERROR: source '$SRC' not loaded. Run bin/setup_aec first." >&2
+    exit 1
+fi
+
+echo "Recording ${DURATION}s from $SRC to $OUT..."
+echo "Speak 'Hey Cleo' while the robot is talking; we want to hear whether"
+echo "your voice survives the echo cancellation."
+
+parec --device="$SRC" --rate=16000 --channels=1 --format=s16le \
+    --file-format=wav "$OUT" &
+PID=$!
+sleep "$DURATION"
+kill "$PID" 2>/dev/null || true
+wait "$PID" 2>/dev/null || true
+
+echo ""
+echo "Recording saved to $OUT"
+echo "Play it back with:   paplay $OUT"
+echo "Or visualize with:   ffplay -f lavfi -i \"amovie=$OUT,showwaves\""

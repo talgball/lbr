@@ -23,14 +23,29 @@ __version__ = "1.0"
 
 
 import os
-import pyttsx3
+import subprocess
+import tempfile
+import threading
 
-from pydub import AudioSegment
-from pydub.playback import play
+import pyttsx3
 
 from robcom.robmsgdict import messageDict
 from robcom import publisher
 from lbrsys.settings import AUDIO_DIR
+
+
+def _aec_sink():
+    """Return the configured PulseAudio AEC sink name, or None if AEC is
+    disabled. Used to select paplay's --device explicitly rather than
+    relying on PULSE_SINK, which SDL-based players (ffplay) only honor
+    when SDL happens to pick the pulse audio backend."""
+    try:
+        from lbrsys.settings import MIC_USE_AEC, MIC_AEC_SINK
+    except ImportError:
+        return None
+    if not MIC_USE_AEC:
+        return None
+    return MIC_AEC_SINK
 
 
 class Robtts:
@@ -42,6 +57,12 @@ class Robtts:
         self.output_format = 'mp3'
         self.supported_formats = ['mp3', 'wav', 'mp4', 'amr', 'amr-wb', 'ogg', 'webm', 'flac']
         self.voice_id = voice_id
+        # Playback subprocess handle for interruptible speech.
+        # pyttsx3's engine.stop() does not work on the espeak backend, so
+        # we synthesize to a file and play via an external subprocess we
+        # can terminate.
+        self._play_proc = None
+        self._play_lock = threading.Lock()
 
 
     #small abstraction in case we need a db / more sophisticated approach
@@ -58,13 +79,15 @@ class Robtts:
 
 
     def sayNow(self, text):
-        self.engine.say(text)
-        self.engine.runAndWait()
+        self._synth_and_play(text)
         self.speechPub.publish(str(text))
 
 
     def say(self, text):
-        self.engine.say(text)
+        # Legacy API — retained for compatibility; behaves like sayNow now
+        # since the blocking vs non-blocking distinction came from pyttsx3's
+        # own event loop which we no longer use.
+        self._synth_and_play(text)
         self.speechPub.publish(str(text))
 
 
@@ -78,9 +101,7 @@ class Robtts:
                         fmt = fname[-1]
                         if fname[0] == msgKey[1:].lower():
                             sf_path = os.path.join(AUDIO_DIR, sf)
-                            # print(f"Matched saved audio file: {sf_path}")
-                            sound = AudioSegment.from_file(sf_path, format=fmt)
-                            play(sound)
+                            self._play_file(sf_path)
                             return
 
         # by default, say as normal
@@ -94,6 +115,50 @@ class Robtts:
         text = self.getText(msgKey, language)
         if text:
             self.say(text)
+
+    def _synth_and_play(self, text):
+        """Synthesize text to a WAV via pyttsx3.save_to_file, then play via
+        ffplay subprocess so the utterance can be interrupted."""
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+            tmp_path = f.name
+        try:
+            self.engine.save_to_file(text, tmp_path)
+            self.engine.runAndWait()
+            self._play_file(tmp_path)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+    def _play_file(self, path):
+        """Play an audio file, retaining the Popen handle so stop() can
+        terminate playback mid-utterance. When AEC is enabled, we route
+        via paplay --device=<sink> so the speaker stream is guaranteed to
+        go through the echo-cancel module as the reference signal. paplay
+        plays WAV natively (pyttsx3's synth output is already WAV)."""
+        sink = _aec_sink()
+        if sink:
+            cmd = ['paplay', '--device=' + sink, path]
+        else:
+            cmd = ['ffplay', '-nodisp', '-autoexit', '-hide_banner',
+                   '-loglevel', 'error', path]
+        with self._play_lock:
+            self._play_proc = subprocess.Popen(
+                cmd, stdin=subprocess.DEVNULL,
+            )
+            proc = self._play_proc
+        proc.wait()
+        with self._play_lock:
+            if self._play_proc is proc:
+                self._play_proc = None
+
+    def stop(self):
+        """Abort any in-flight speech playback immediately."""
+        with self._play_lock:
+            proc = self._play_proc
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
 
 
 def main(testSentences, tts=None):

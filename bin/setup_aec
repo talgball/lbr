@@ -1,0 +1,51 @@
+#!/bin/bash
+# Load PulseAudio's module-echo-cancel using the WebRTC AEC3 backend.
+# Creates virtual source "mic_aec" (AEC'd mic) and sink "spk_aec" (speaker
+# with reference tap) on top of the currently-default mic and speaker.
+#
+# Run once per login session before starting lbrsys. Idempotent — if
+# the module is already loaded with the expected name, exit successfully.
+
+set -euo pipefail
+
+SOURCE_NAME="mic_aec"
+SINK_NAME="spk_aec"
+
+# If already loaded, we're done
+if pactl list short modules | awk '{print $2}' | grep -q '^module-echo-cancel$'; then
+    # Check that our named virtual devices exist
+    if pactl list short sources | awk '{print $2}' | grep -qx "$SOURCE_NAME" \
+       && pactl list short sinks | awk '{print $2}' | grep -qx "$SINK_NAME"; then
+        echo "AEC already loaded: source=$SOURCE_NAME sink=$SINK_NAME"
+        exit 0
+    else
+        echo "module-echo-cancel loaded but devices missing — unloading to reload"
+        pactl unload-module module-echo-cancel || true
+    fi
+fi
+
+# Pick current defaults as the masters so the user can switch speakers
+# (e.g., Bluetooth vs built-in) by changing defaults before calling this.
+SOURCE_MASTER=$(pactl info | awk -F': ' '/Default Source/ {print $2}')
+SINK_MASTER=$(pactl info | awk -F': ' '/Default Sink/ {print $2}')
+
+echo "Loading module-echo-cancel:"
+echo "  source_master = $SOURCE_MASTER -> source $SOURCE_NAME"
+echo "  sink_master   = $SINK_MASTER   -> sink   $SINK_NAME"
+
+# Note on rate/channels: module-echo-cancel resamples both master streams
+# to the requested internal rate/channels before running AEC, then converts
+# back on the way out. 16kHz mono matches both what the wake-word model
+# wants and WebRTC's native processing rate. We intentionally do NOT pass
+# aec_args — WebRTC AEC3 defaults are tuned well and passing them on the
+# pactl command line is error-prone because their spaces get split.
+pactl load-module module-echo-cancel \
+    aec_method=webrtc \
+    source_master="$SOURCE_MASTER" \
+    sink_master="$SINK_MASTER" \
+    source_name="$SOURCE_NAME" \
+    sink_name="$SINK_NAME" \
+    rate=16000 \
+    channels=1
+
+echo "Done. Use PULSE_SOURCE=$SOURCE_NAME / PULSE_SINK=$SINK_NAME in lbrsys."
